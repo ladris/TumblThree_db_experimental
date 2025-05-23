@@ -4,16 +4,18 @@ using System.Threading;
 using TumblThree.Applications.DataModels;
 using TumblThree.Applications.DataModels.TumblrPosts;
 using TumblThree.Applications.Services;
+using TumblThree.Domain.Database; // Added
 using TumblThree.Domain.Models.Blogs;
-using TumblThree.Domain.Models.Files;
+//using TumblThree.Domain.Models.Files; // Removed
 
 namespace TumblThree.Applications.Downloader
 {
     public class BlueskyDownloader : AbstractDownloader
     {
         public BlueskyDownloader(IShellService shellService, IManagerService managerService, CancellationToken ct, PauseToken pt, IProgress<DownloadProgress> progress,
-            IPostQueue<AbstractPost> postQueue, FileDownloader fileDownloader, ICrawlerService crawlerService = null, IBlog blog = null, IFiles files = null)
-            : base(shellService, managerService, ct, pt, progress, postQueue, fileDownloader, crawlerService, blog, files)
+            IPostQueue<AbstractPost> postQueue, FileDownloader fileDownloader, DatabaseService databaseService, /* Added */ 
+            ICrawlerService crawlerService = null, IBlog blog = null /* IFiles files = null Removed */)
+            : base(shellService, managerService, ct, pt, progress, postQueue, fileDownloader, databaseService, crawlerService, blog) // Pass databaseService, files removed
         {
         }
          

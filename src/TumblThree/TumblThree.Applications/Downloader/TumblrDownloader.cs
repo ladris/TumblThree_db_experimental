@@ -8,8 +8,9 @@ using System.Threading.Tasks;
 using TumblThree.Applications.DataModels;
 using TumblThree.Applications.DataModels.TumblrPosts;
 using TumblThree.Applications.Services;
+using TumblThree.Domain.Database; // Added
 using TumblThree.Domain.Models.Blogs;
-using TumblThree.Domain.Models.Files;
+//using TumblThree.Domain.Models.Files; // Removed
 
 namespace TumblThree.Applications.Downloader
 {
@@ -19,8 +20,8 @@ namespace TumblThree.Applications.Downloader
 
         public TumblrDownloader(IShellService shellService, IManagerService managerService, PauseToken pt,
             IProgress<DownloadProgress> progress, IPostQueue<AbstractPost> postQueue, FileDownloader fileDownloader,
-            ICrawlerService crawlerService, IBlog blog, IFiles files, CancellationToken ct)
-            : base(shellService, managerService, ct, pt, progress, postQueue, fileDownloader, crawlerService, blog, files)
+            DatabaseService databaseService, /* Added */ ICrawlerService crawlerService, IBlog blog, CancellationToken ct /* IFiles files Removed */)
+            : base(shellService, managerService, ct, pt, progress, postQueue, fileDownloader, databaseService, crawlerService, blog) // Pass databaseService, files removed
         {
         }
 

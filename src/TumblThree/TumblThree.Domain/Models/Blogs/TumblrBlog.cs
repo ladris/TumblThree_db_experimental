@@ -2,40 +2,52 @@
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Runtime.Serialization;
+//using System.Runtime.Serialization; // Commented out
 
-using TumblThree.Domain.Models.Files;
+//using TumblThree.Domain.Models.Files; // No longer creating TumblrBlogFiles here
+using TumblThree.Domain.Database; // Added for BlogDto
 
 namespace TumblThree.Domain.Models.Blogs
 {
-    [DataContract]
+    //[DataContract] // Commented out
     public class TumblrBlog : Blog
     {
+        // New constructor
+        public TumblrBlog(BlogDto dto, BlogRuntimeSettings settings = null) : base(dto, settings)
+        {
+            // Tumblr specific initialization from DTO if any
+            // For example, if OriginalBlogType needs to be specifically set for Tumblr type
+            this.OriginalBlogType = BlogTypes.tumblr;
+        }
+
+        // Adapted static Create method
         public static Blog Create(string url, string location, string filenameTemplate, bool isCustomDomain = false)
         {
-            url = isCustomDomain ? url : ExtractUrl(ConvertNewFormatUrl(url));
-            var name = isCustomDomain ? ExtractCustomName(url) : ExtractName(url);
-            var blog = new TumblrBlog()
+            string processedUrl = isCustomDomain ? url : ExtractUrl(ConvertNewFormatUrl(url));
+            var name = isCustomDomain ? ExtractCustomName(url) : ExtractName(processedUrl); // Use processedUrl for name extraction if not custom
+
+            var dto = new BlogDto
             {
-                Url = url,
                 Name = name,
-                BlogType = BlogTypes.tumblr,
-                OriginalBlogType = BlogTypes.tumblr,
-                Location = location,
-                Online = true,
-                Version = "4",
-                DateAdded = DateTime.Now,
-                FilenameTemplate = filenameTemplate
+                Url = processedUrl, // Use the processed URL
+                BlogType = BlogTypes.tumblr.ToString(),
+                DownloadLocation = location, // This is the root download path
+                AddedTimestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                Version = "4.0", // Or use a shared constant for app/schema version
+                OnlineStatus = true, // Default for new blogs
+                // Title, Description, etc., can be populated later during a crawl/update
             };
 
-            Directory.CreateDirectory(location);
-
-            blog.ChildId = Path.Combine(location, blog.Name + "_files." + blog.BlogType);
-            if (!File.Exists(blog.ChildId))
+            var runtimeSettings = new BlogRuntimeSettings
             {
-                IFiles files = new TumblrBlogFiles(blog.Name, blog.Location);
-                files.Save();
-            }
+                FilenameTemplate = filenameTemplate
+                // Set any Tumblr-specific default settings here if needed
+            };
+            
+            var blog = new TumblrBlog(dto, runtimeSettings);
+            // blog.Settings.FilenameTemplate is already set by passing runtimeSettings to constructor.
+            // No direct file system interaction here (e.g., Directory.CreateDirectory or saving TumblrBlogFiles)
+            // The caller (e.g., ManagerController) will handle DB insertion.
 
             return blog;
         }

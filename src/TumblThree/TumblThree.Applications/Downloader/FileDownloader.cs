@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using TumblThree.Applications.Extensions;
 using TumblThree.Applications.Properties;
 using TumblThree.Applications.Services;
+using TumblThree.Domain.Database; // Added for DatabaseService
 
 namespace TumblThree.Applications.Downloader
 {
@@ -30,10 +31,7 @@ namespace TumblThree.Applications.Downloader
 
         public event EventHandler<DownloadProgressChangedEventArgs> ProgressChanged;
 
-        // TODO: Needs a complete rewrite. Also a append/cache function for resuming incomplete files on the disk.
-        // Should be in separated class with support for events for downloadspeed, is resumable file?, etc.
-        // Should check if file is complete, else it will trigger an WebException -- 416 requested range not satisfiable at every request
-        public async Task<(bool result, string destinationPath)> DownloadFileWithResumeAsync(string url, string destinationPath)
+        public async Task<(bool result, string destinationPath)> DownloadFileWithResumeAsync(string url, string destinationPath, int downloadId, int blogId, DatabaseService databaseService)
         {
             long totalBytesReceived = 0;
             var attemptCount = 0;
@@ -54,7 +52,11 @@ namespace TumblThree.Applications.Downloader
                 }
             }
 
-            if (ct.IsCancellationRequested) return (false, destinationPath);
+            if (ct.IsCancellationRequested)
+            {
+                databaseService.UpdateDownloadStatus(downloadId, "paused", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+                return (false, destinationPath);
+            }
 
             var fileMode = totalBytesReceived > 0 ? FileMode.Append : FileMode.Create;
 
@@ -108,40 +110,72 @@ namespace TumblThree.Applications.Downloader
                                     //float currentSpeed = totalBytesReceived / (float)sw.Elapsed.TotalSeconds;
                                     //OnProgressChanged(new DownloadProgressChangedEventArgs(totalBytesReceived,
                                     //    totalBytesToReceive, (long)currentSpeed));
+                                    
+                                    // DB Progress Update
+                                    databaseService.UpdateDownloadProgressAndStatus(downloadId, totalBytesReceived, totalBytesToReceive, "downloading", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
                                 }
                             }
                             isChunked = isChunked && response.Headers.ToString().Contains("Content-Range");
                         }
 
-                        if (!isChunked && totalBytesReceived >= totalBytesToReceive) break;
-                        if (isChunked) attemptCount = 0;
+                        if (!isChunked && totalBytesReceived >= totalBytesToReceive)
+                        {
+                            databaseService.UpdateDownloadStatus(downloadId, "completed", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+                            break;
+                        }
+                        if (isChunked && totalBytesToReceive == 0 && totalBytesReceived > 0) // Chunked and received some data, assume completed for now
+                        {
+                             databaseService.UpdateDownloadStatus(downloadId, "completed", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+                             break;
+                        }
+                        if (isChunked) attemptCount = 0; // Reset attempts for chunked successful reads
                     }
                     catch (IOException ioException)
                     {
-                        // file in use
                         long win32ErrorCode = ioException.HResult & 0xFFFF;
-                        if (win32ErrorCode == 0x21 || win32ErrorCode == 0x20) return (false, destinationPath);
-
-                        // retry (IOException: Received an unexpected EOF or 0 bytes from the transport stream)
+                        if (win32ErrorCode == 0x21 || win32ErrorCode == 0x20) // file in use
+                        {
+                            databaseService.UpdateDownloadStatus(downloadId, "error", DateTimeOffset.UtcNow.ToUnixTimeSeconds()); // Or a specific status like "file_in_use"
+                            databaseService.IncrementDownloadRetry(downloadId, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+                            return (false, destinationPath);
+                        }
+                        // For other IOExceptions (like unexpected EOF), retry logic below handles it.
+                        // Consider logging this specific type of IOException if it's frequent.
+                        databaseService.UpdateDownloadStatus(downloadId, "error_io", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+                        databaseService.IncrementDownloadRetry(downloadId, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
                     }
                     catch (WebException webException)
                     {
+                        databaseService.UpdateDownloadStatus(downloadId, "error_web", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+                        databaseService.IncrementDownloadRetry(downloadId, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
                         if (webException.Status == WebExceptionStatus.ConnectionClosed)
                         {
-                            // retry
+                            // retry is handled by the loop
                         }
                         else
                         {
-                            throw;
+                            throw; // Re-throw if it's not a connection closed error that we want to retry within the loop
                         }
+                    }
+                    catch (TimeoutException) // Specifically from TimeoutAfter extension
+                    {
+                        databaseService.UpdateDownloadStatus(downloadId, "error_timeout", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+                        databaseService.IncrementDownloadRetry(downloadId, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+                        // Retry is handled by the loop
+                    }
+                    catch (Exception ex) // Catch-all for other unexpected errors during download attempt
+                    {
+                        databaseService.UpdateDownloadStatus(downloadId, "error_unknown", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+                        databaseService.IncrementDownloadRetry(downloadId, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+                        Logger.Error("FileDownloader:DownloadFileWithResumeAsync: Unknown error during download loop: {0}", ex);
+                        // Depending on policy, might re-throw or let retry logic handle.
                     }
                     finally
                     {
                         requestRegistration.Dispose();
                     }
                 }
-
-                return (true, destinationPath);
+                return (true, destinationPath); // Success
             }
             finally
             {
@@ -149,7 +183,7 @@ namespace TumblThree.Applications.Downloader
             }
         }
 
-        private async Task<(long contentLength, string destinationPath)> CheckDownloadSizeAsync(string url, string destinationPath)
+        private async Task<(long contentLength, string destinationPath)> CheckDownloadSizeAsync(string url, string destinationPath) // No downloadId needed here, just checking size
         {
             var requestRegistration = new CancellationTokenRegistration();
             try

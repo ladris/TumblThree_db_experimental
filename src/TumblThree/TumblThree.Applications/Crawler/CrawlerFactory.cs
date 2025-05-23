@@ -30,10 +30,11 @@ namespace TumblThree.Applications.Crawler
         private readonly AppSettings settings;
         private readonly IEnvironmentService environmentService;
         private readonly ILoginService loginService;
+    private readonly DatabaseService databaseService; // Added
 
         [ImportingConstructor]
         internal CrawlerFactory(ICrawlerService crawlerService, IManagerService managerService, ShellService shellService,
-            ISharedCookieService cookieService, IEnvironmentService environmentService, ILoginService loginService)
+        ISharedCookieService cookieService, IEnvironmentService environmentService, ILoginService loginService, DatabaseService databaseService /* Added */)
         {
             this.crawlerService = crawlerService;
             this.managerService = managerService;
@@ -41,6 +42,7 @@ namespace TumblThree.Applications.Crawler
             this.cookieService = cookieService;
             this.environmentService = environmentService;
             this.loginService = loginService;
+        this.databaseService = databaseService; // Added
             settings = shellService.Settings;
         }
 
@@ -64,7 +66,7 @@ namespace TumblThree.Applications.Crawler
         {
             blog.DownloadedItemsNew = 0;
             IPostQueue<AbstractPost> postQueue = GetProducerConsumerCollection();
-            IFiles files = LoadFiles(blog);
+            // IFiles files = LoadFiles(blog); // Removed: files are no longer loaded/passed this way
             IWebRequestFactory webRequestFactory = GetWebRequestFactory();
             IImgurParser imgurParser = GetImgurParser(webRequestFactory, ct);
             switch (blog.BlogType)
@@ -72,53 +74,53 @@ namespace TumblThree.Applications.Crawler
                 case BlogTypes.tumblr:
                     IPostQueue<CrawlerData<Post>> jsonApiQueue = GetJsonQueue<Post>();
                     return new TumblrBlogCrawler(shellService, crawlerService, webRequestFactory, cookieService,
-                        GetTumblrDownloader(progress, blog, files, postQueue, pt, ct), GetJsonDownloader(jsonApiQueue, blog, pt, ct),
+                        GetTumblrDownloader(progress, blog, postQueue, pt, ct), GetJsonDownloader(jsonApiQueue, blog, pt, ct), // files removed
                         GetTumblrApiJsonToTextParser(blog), GetTumblrParser(), imgurParser, GetWebmshareParser(),
                         GetUguuParser(), GetCatBoxParser(), postQueue,
                         jsonApiQueue, blog, progress, pt, ct);
                 case BlogTypes.tmblrpriv:
                     IPostQueue<CrawlerData<DataModels.TumblrSvcJson.Post>> jsonSvcQueue =
-                        GetJsonQueue<DataModels.TumblrSvcJson.Post>();
+                        GetJsonQueue<DataModels.TumblrSvcJson.Post>>();
                     return new TumblrHiddenCrawler(shellService, crawlerService, webRequestFactory,
-                        cookieService, GetTumblrDownloader(progress, blog, files, postQueue, pt, ct),
+                        cookieService, GetTumblrDownloader(progress, blog, postQueue, pt, ct), // files removed
                         GetJsonDownloader(jsonSvcQueue, blog, pt, ct), GetTumblrSvcJsonToTextParser(blog), GetTumblrParser(),
                         imgurParser, GetWebmshareParser(), GetUguuParser(),
                         GetCatBoxParser(), postQueue, jsonSvcQueue, blog, progress, environmentService, loginService, pt, ct);
                 case BlogTypes.tlb:
-                    IPostQueue<CrawlerData<DataModels.TumblrSearchJson.Data>> jsonDataQueue = GetJsonQueue<DataModels.TumblrSearchJson.Data>();
+                    IPostQueue<CrawlerData<DataModels.TumblrSearchJson.Data>> jsonDataQueue = GetJsonQueue<DataModels.TumblrSearchJson.Data>>();
                     return new TumblrLikedByCrawler(shellService, crawlerService, webRequestFactory,
-                        cookieService, GetTumblrDownloader(progress, blog, files, postQueue, pt, ct), GetJsonDownloader(jsonDataQueue, blog, pt, ct),
+                        cookieService, GetTumblrDownloader(progress, blog, postQueue, pt, ct), GetJsonDownloader(jsonDataQueue, blog, pt, ct), // files removed
                         GetTumblrApiJsonToTextParser(blog), GetTumblrParser(),
                         imgurParser, GetWebmshareParser(), GetUguuParser(),
                         GetCatBoxParser(), postQueue, jsonDataQueue, blog, progress, environmentService, loginService, pt, ct);
                 case BlogTypes.tumblrsearch:
                     IPostQueue<CrawlerData<string>> jsonQueue = GetJsonQueue<string>();
                     return new TumblrSearchCrawler(shellService, crawlerService, webRequestFactory,
-                        cookieService, GetTumblrDownloader(progress, blog, files, postQueue, pt, ct), GetJsonDownloader(jsonQueue, blog, pt, ct),
+                        cookieService, GetTumblrDownloader(progress, blog, postQueue, pt, ct), GetJsonDownloader(jsonQueue, blog, pt, ct), // files removed
                         GetTumblrApiJsonToTextParser(blog), GetTumblrParser(), imgurParser, GetWebmshareParser(),
                         GetUguuParser(), GetCatBoxParser(), postQueue, jsonQueue, blog, progress, pt, ct);
                 case BlogTypes.tumblrtagsearch:
                     IPostQueue<CrawlerData<DataModels.TumblrTaggedSearchJson.Datum>> jsonTagSearchQueue =
                         GetJsonQueue<DataModels.TumblrTaggedSearchJson.Datum>();
                     return new TumblrTagSearchCrawler(shellService, crawlerService, webRequestFactory,
-                        cookieService, GetTumblrDownloader(progress, blog, files, postQueue, pt, ct),
+                        cookieService, GetTumblrDownloader(progress, blog, postQueue, pt, ct), // files removed
                         GetJsonDownloader(jsonTagSearchQueue, blog, pt, ct), GetTumblrParser(),
                         imgurParser, GetWebmshareParser(), GetUguuParser(),
                         GetCatBoxParser(), postQueue, jsonTagSearchQueue, blog, progress, pt, ct);
                 case BlogTypes.twitter:
                     IPostQueue<CrawlerData<Tweet>> jsonTwitterQueue = GetJsonQueue<Tweet>();
                     return new TwitterCrawler(shellService, crawlerService, progress, webRequestFactory,
-                        cookieService, postQueue, jsonTwitterQueue, blog, GetTwitterDownloader(progress, blog, files, postQueue, pt, ct),
+                        cookieService, postQueue, jsonTwitterQueue, blog, GetTwitterDownloader(progress, blog, postQueue, pt, ct), // files removed
                         GetJsonDownloader(jsonTwitterQueue, blog, pt, ct), pt, ct);
                 case BlogTypes.newtumbl:
-                    IPostQueue<CrawlerData<DataModels.NewTumbl.Post>> jsonNewTumblQueue = GetJsonQueue<DataModels.NewTumbl.Post>();
+                    IPostQueue<CrawlerData<DataModels.NewTumbl.Post>> jsonNewTumblQueue = GetJsonQueue<DataModels.NewTumbl.Post>>();
                     return new NewTumblCrawler(shellService, crawlerService, progress, webRequestFactory,
-                        cookieService, postQueue, jsonNewTumblQueue, blog, GetNewTumblDownloader(progress, blog, files, postQueue, pt, ct),
+                        cookieService, postQueue, jsonNewTumblQueue, blog, GetNewTumblDownloader(progress, blog, postQueue, pt, ct), // files removed
                         GetJsonDownloader(jsonNewTumblQueue, blog, pt, ct), GetNewTumblParser(), pt, ct);
                 case BlogTypes.bluesky:
-                    IPostQueue<CrawlerData<DataModels.Bluesky.FeedEntry>> jsonBlueskyQueue = GetJsonQueue<DataModels.Bluesky.FeedEntry>();
+                    IPostQueue<CrawlerData<DataModels.Bluesky.FeedEntry>> jsonBlueskyQueue = GetJsonQueue<DataModels.Bluesky.FeedEntry>>();
                     return new BlueskyCrawler(shellService, crawlerService, progress, webRequestFactory,
-                        cookieService, postQueue, jsonBlueskyQueue, blog, GeBlueskyDownloader(progress, blog, files, postQueue, pt, ct),
+                        cookieService, postQueue, jsonBlueskyQueue, blog, GetBlueskyDownloader(progress, blog, postQueue, pt, ct), // files removed, renamed GeBlueskyDownloader
                         GetJsonDownloader(jsonBlueskyQueue, blog, pt, ct), pt, ct);
 
                 default:
@@ -126,23 +128,23 @@ namespace TumblThree.Applications.Crawler
             }
         }
 
-        private IFiles LoadFiles(IBlog blog)
-        {
-            if (settings.LoadAllDatabases)
-            {
-                var files = managerService.Databases.FirstOrDefault(file => file.Name.Equals(blog.Name) && file.BlogType.Equals(blog.OriginalBlogType));
-                if (files == null)
-                {
-                    var s = string.Format("{0} ({1})", blog.Name, blog.BlogType);
-                    Logger.Error(Resources.CouldNotLoadLibrary, s);
-                    shellService.ShowError(new KeyNotFoundException(), Resources.CouldNotLoadLibrary, s);
-                    throw new KeyNotFoundException(s);
-                }
-                return files;
-            }
+        // private IFiles LoadFiles(IBlog blog) // Removed
+        // {
+        //     if (settings.LoadAllDatabases)
+        //     {
+        //         var files = managerService.Databases.FirstOrDefault(file => file.Name.Equals(blog.Name) && file.BlogType.Equals(blog.OriginalBlogType));
+        //         if (files == null)
+        //         {
+        //             var s = string.Format("{0} ({1})", blog.Name, blog.BlogType);
+        //             Logger.Error(Resources.CouldNotLoadLibrary, s);
+        //             shellService.ShowError(new KeyNotFoundException(), Resources.CouldNotLoadLibrary, s);
+        //             throw new KeyNotFoundException(s);
+        //         }
+        //         return files;
+        //     }
 
-            return Files.Load(blog.ChildId, settings.BufferSizeIO);
-        }
+        //     return Files.Load(blog.ChildId, settings.BufferSizeIO);
+        // }
 
         private IWebRequestFactory GetWebRequestFactory()
         {
@@ -184,37 +186,37 @@ namespace TumblThree.Applications.Crawler
             return new FileDownloader(settings, ct, GetWebRequestFactory(), cookieService);
         }
 
-        private static IBlogService GetBlogService(IBlog blog, IFiles files)
-        {
-            return new BlogService(blog, files);
-        }
+        // private static IBlogService GetBlogService(IBlog blog, IFiles files) // Removed IFiles
+        // {
+        //     return new BlogService(blog, files); // This service might need DatabaseService if it interacts with file data
+        // }
 
-        private TwitterDownloader GetTwitterDownloader(IProgress<DownloadProgress> progress, IBlog blog, IFiles files,
+        private TwitterDownloader GetTwitterDownloader(IProgress<DownloadProgress> progress, IBlog blog, /* IFiles files, Removed */
             IPostQueue<AbstractPost> postQueue, PauseToken pt, CancellationToken ct)
         {
             return new TwitterDownloader(shellService, managerService, ct, pt, progress, postQueue, GetFileDownloader(ct),
-                crawlerService, blog, files);
+                databaseService, crawlerService, blog); // Added databaseService, removed files
         }
 
-        private NewTumblDownloader GetNewTumblDownloader(IProgress<DownloadProgress> progress, IBlog blog, IFiles files,
+        private NewTumblDownloader GetNewTumblDownloader(IProgress<DownloadProgress> progress, IBlog blog, /* IFiles files, Removed */
             IPostQueue<AbstractPost> postQueue, PauseToken pt, CancellationToken ct)
         {
             return new NewTumblDownloader(shellService, managerService, ct, pt, progress, postQueue, GetFileDownloader(ct),
-                crawlerService, blog, files);
+                databaseService, crawlerService, blog); // Added databaseService, removed files
         }
 
-        private BlueskyDownloader GeBlueskyDownloader(IProgress<DownloadProgress> progress, IBlog blog, IFiles files,
+        private BlueskyDownloader GetBlueskyDownloader(IProgress<DownloadProgress> progress, IBlog blog, /* IFiles files, Removed */ // Renamed from GeBlueskyDownloader
             IPostQueue<AbstractPost> postQueue, PauseToken pt, CancellationToken ct)
         {
             return new BlueskyDownloader(shellService, managerService, ct, pt, progress, postQueue, GetFileDownloader(ct),
-                crawlerService, blog, files);
+                databaseService, crawlerService, blog); // Added databaseService, removed files
         }
 
-        private TumblrDownloader GetTumblrDownloader(IProgress<DownloadProgress> progress, IBlog blog, IFiles files,
+        private TumblrDownloader GetTumblrDownloader(IProgress<DownloadProgress> progress, IBlog blog, /* IFiles files, Removed */
             IPostQueue<AbstractPost> postQueue, PauseToken pt, CancellationToken ct)
         {
             return new TumblrDownloader(shellService, managerService, pt, progress, postQueue, GetFileDownloader(ct),
-                crawlerService, blog, files, ct);
+                databaseService, crawlerService, blog, ct); // Added databaseService, removed files
         }
 
         private TumblrXmlDownloader GetTumblrXmlDownloader(IPostQueue<CrawlerData<XDocument>> xmlQueue, IBlog blog,

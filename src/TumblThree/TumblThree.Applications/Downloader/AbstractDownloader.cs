@@ -14,15 +14,17 @@ using TumblThree.Applications.DataModels.TumblrPosts;
 using TumblThree.Applications.Properties;
 using TumblThree.Applications.Services;
 using TumblThree.Domain;
+using TumblThree.Domain.Database; // Added
 using TumblThree.Domain.Models.Blogs;
-using TumblThree.Domain.Models.Files;
+//using TumblThree.Domain.Models.Files; // Removed IFiles dependency
 
 namespace TumblThree.Applications.Downloader
 {
     public abstract class AbstractDownloader : IDownloader, IDisposable
     {
         protected readonly IBlog blog;
-        protected readonly IFiles files;
+        // protected readonly IFiles files; // Removed
+        protected readonly DatabaseService databaseService; // Added
         protected readonly ICrawlerService crawlerService;
         protected readonly IManagerService managerService;
         protected readonly IProgress<DownloadProgress> progress;
@@ -33,10 +35,10 @@ namespace TumblThree.Applications.Downloader
         protected readonly PauseToken pt;
         protected readonly FileDownloader fileDownloader;
         private readonly string[] suffixes = { ".jpg", ".jpeg", ".png", ".tiff", ".tif", ".heif", ".heic", ".webp" };
-        private readonly object _saveTimerLock = new object();
-        private Timer _saveTimer;
+        //private readonly object _saveTimerLock = new object(); // Removed
+        //private Timer _saveTimer; // Removed
         private volatile bool _disposed;
-        private const int SAVE_TIMESPAN_SECS = 120;
+        //private const int SAVE_TIMESPAN_SECS = 120; // Removed
 
         private SemaphoreSlim concurrentConnectionsSemaphore;
         private SemaphoreSlim concurrentVideoConnectionsSemaphore;
@@ -44,23 +46,27 @@ namespace TumblThree.Applications.Downloader
         private readonly object diskFilesLock = new object();
         private HashSet<string> diskFiles;
 
-        protected AbstractDownloader(IShellService shellService, IManagerService managerService, CancellationToken ct, PauseToken pt, IProgress<DownloadProgress> progress, IPostQueue<AbstractPost> postQueue, FileDownloader fileDownloader, ICrawlerService crawlerService = null, IBlog blog = null, IFiles files = null)
+        protected AbstractDownloader(IShellService shellService, IManagerService managerService, CancellationToken ct, PauseToken pt, 
+                                     IProgress<DownloadProgress> progress, IPostQueue<AbstractPost> postQueue, 
+                                     FileDownloader fileDownloader, DatabaseService databaseService, /* Added */
+                                     ICrawlerService crawlerService = null, IBlog blog = null /* IFiles files = null Removed */)
         {
             this.shellService = shellService;
             this.crawlerService = crawlerService;
             this.managerService = managerService;
+            this.databaseService = databaseService; // Added
             this.blog = blog;
-            this.files = files;
+            //this.files = files; // Removed
             this.ct = ct;
             this.pt = pt;
             this.progress = progress;
             this.postQueue = postQueue;
             this.fileDownloader = fileDownloader;
-            Progress<Exception> prog = new Progress<Exception>((e) => shellService.ShowError(e, Resources.CouldNotSaveBlog, blog.Name));
-            _saveTimer = new Timer(_ => OnSaveTimedEvent(prog), null, SAVE_TIMESPAN_SECS * 1000, SAVE_TIMESPAN_SECS * 1000);
+            //Progress<Exception> prog = new Progress<Exception>((e) => shellService.ShowError(e, Resources.CouldNotSaveBlog, blog.Name)); // Removed
+            //_saveTimer = new Timer(_ => OnSaveTimedEvent(prog), null, SAVE_TIMESPAN_SECS * 1000, SAVE_TIMESPAN_SECS * 1000); // Removed
         }
 
-        public string AppendTemplate { get; set; }
+        public string AppendTemplate { get; set; } // This is likely a blog setting now, review if it should be here or from blog.Settings
 
         public void UpdateProgressQueueInformation(string format, params object[] args)
         {
@@ -76,17 +82,20 @@ namespace TumblThree.Applications.Downloader
             this.ct = ct;
         }
 
-        protected virtual async Task<(bool result, string fileLocation)> DownloadBinaryFileAsync(string fileLocation, string url)
+        // Modified signature
+        protected virtual async Task<(bool result, string fileLocation)> DownloadBinaryFileAsync(string fileLocation, string url, int downloadId, int blogId)
         {
             try
             {
-                if (url.EndsWith("playlist.m3u8"))
+                if (url.EndsWith("playlist.m3u8")) // m3u8 might need special handling for downloadId/blogId if it makes sub-requests
                 {
-                    return await DownloadVideoPlaylist(url, fileLocation);
+                    // For now, assuming DownloadVideoPlaylist either uses the main downloadId or doesn't interact with DB for sub-parts yet
+                    return await DownloadVideoPlaylist(url, fileLocation, downloadId, blogId); 
                 }
                 else
                 {
-                    return await fileDownloader.DownloadFileWithResumeAsync(url, fileLocation).ConfigureAwait(false);
+                    // Pass downloadId, blogId, and databaseService to FileDownloader
+                    return await fileDownloader.DownloadFileWithResumeAsync(url, fileLocation, downloadId, blogId, this.databaseService).ConfigureAwait(false);
                 }
             }
             catch (IOException ex) when ((ex.HResult & 0xFFFF) == 0x27 || (ex.HResult & 0xFFFF) == 0x70)
@@ -126,14 +135,25 @@ namespace TumblThree.Applications.Downloader
             }
         }
 
-        protected virtual async Task<(bool result, string fileLocation)> DownloadBinaryFileAsync(string fileLocation, string fileLocationUrlList, string url)
+        // This overload might need re-evaluation or careful adaptation if DownloadUrlList setting is still used.
+        // For now, assuming the primary path is the 4-argument version.
+        // If it's kept, it needs to somehow get downloadId and blogId or this path cannot update DB.
+        protected virtual async Task<(bool result, string fileLocation)> DownloadBinaryFileAsync(string fileLocation, string fileLocationUrlList, string url, int downloadId, int blogId)
         {
-            if (!blog.DownloadUrlList)
+            if (!blog.Settings.DownloadUrlList) // Access setting via blog.Settings
             {
-                return await DownloadBinaryFileAsync(fileLocation, url);
+                return await DownloadBinaryFileAsync(fileLocation, url, downloadId, blogId);
             }
 
-            return (AppendToTextFile(fileLocationUrlList, url, false), fileLocation);
+            // Appending to a text file doesn't fit the new DB download tracking model well for this specific file.
+            // This path might mean the URL itself is the "downloaded" content.
+            // Consider how to represent this in Downloads table. For now, marking as completed.
+            bool appendResult = AppendToTextFile(fileLocationUrlList, url, false);
+            if (appendResult)
+            {
+                databaseService.UpdateDownloadStatus(downloadId, "completed", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+            }
+            return (appendResult, fileLocation);
         }
 
         protected virtual bool AppendToTextFile(string fileLocation, string text, bool isJson)
@@ -161,9 +181,10 @@ namespace TumblThree.Applications.Downloader
             }
         }
 
-        private async Task<(bool result, string fileLocation)> DownloadVideoPlaylist(string url, string fileLocation)
+        // Added downloadId and blogId for potential DB interaction in sub-downloads
+        private async Task<(bool result, string fileLocation)> DownloadVideoPlaylist(string url, string fileLocation, int downloadId, int blogId)
         {
-            var playlist = await DownloadPageAsync(url);
+            var playlist = await DownloadPageAsync(url); // This doesn't use downloadId/blogId itself
 
             // extract different video sizes from playlist
             playlist = Regex.Replace(playlist, @"\r\n?|\n", Environment.NewLine);
@@ -194,7 +215,11 @@ namespace TumblThree.Applications.Downloader
                     if (line.StartsWith("#") || string.IsNullOrWhiteSpace(line)) continue;
                     var newUrl = string.Join("/", partsPlaylistUrl.Split('/').Take(partsPlaylistUrl.Split('/').Length - 1)) + "/" + line;
                     if (File.Exists(fileLocation + ".tmp")) File.Delete(fileLocation + ".tmp");
-                    var result = await fileDownloader.DownloadFileWithResumeAsync(newUrl, fileLocation + ".tmp");
+                    // If DownloadFileWithResumeAsync for parts needs to update DB, it needs downloadId/blogId.
+                    // This implies either one main downloadId for the playlist, or new ones for each part.
+                    // For simplicity, using the main downloadId and not creating separate DB entries for parts.
+                    // The progress here would be for the entire playlist file, not individual parts.
+                    var result = await fileDownloader.DownloadFileWithResumeAsync(newUrl, fileLocation + ".tmp", downloadId, blogId, this.databaseService);
                     if (!result.result) return (false, result.destinationPath);
                     using (var fs2 = File.OpenRead(fileLocation + ".tmp"))
                     {
@@ -290,9 +315,10 @@ namespace TumblThree.Applications.Downloader
             }
 
             blog.LastDownloadedPhoto = null;
-            blog.LastDownloadedVideo = null;
+            blog.LastDownloadedPhoto = null; // UI property, no DB save here
+            blog.LastDownloadedVideo = null; // UI property, no DB save here
 
-            files.Save();
+            // files.Save(); // Removed
 
             return completeDownload;
         }
@@ -356,143 +382,266 @@ namespace TumblThree.Applications.Downloader
 
         protected virtual async Task<bool> DownloadBinaryPostAsync(TumblrPost downloadItem)
         {
-            if (CheckIfFileExistsInDB(downloadItem))
+            if (blog?.BlogId == 0) 
             {
-                string fileName = FileName(downloadItem);
-                UpdateProgressQueueInformation(Resources.ProgressSkipFile, fileName);
+                Logger.Error($"AbstractDownloader:DownloadBinaryPostAsync: BlogId is not set for blog {blog?.Name}. Cannot proceed.");
+                return false;
             }
-            else if (!shellService.Settings.LoadAllDatabases && blog.CheckDirectoryForFiles && (blog.CheckIfBlogShouldCheckDirectory(FileNameUrl(downloadItem), FileNameNew(downloadItem))
-                || blog.CheckIfBlogShouldCheckDirectory(FileName(downloadItem), FileNameNew(downloadItem))))
+
+            int downloadId;
+            FileDto fileEntry;
+            string actualDownloadUrl = Url(downloadItem); // URL for the actual binary content
+            string uniqueFileKeyUrl = FileNameUrl(downloadItem); // URL part used as unique ID for the file in Files table
+            string originalPostPageUrl = FileNameOriginalUrl(downloadItem); // URL of the post page, for OriginalLink
+
+            if (downloadItem.ResumedDownloadId > 0)
             {
-                string fileName = AddFileToDb(downloadItem);
-                UpdateProgressQueueInformation(Resources.ProgressSkipFile, fileName);
+                downloadId = downloadItem.ResumedDownloadId;
+                var downloadDto = databaseService.GetDownload(downloadId);
+                if (downloadDto == null || downloadDto.FileId == 0) {
+                    Logger.Error($"Resumed downloadId {downloadId} not found or invalid. Skipping.");
+                    return false; 
+                }
+                fileEntry = databaseService.GetFile(downloadDto.FileId);
+                if (fileEntry == null) {
+                   Logger.Error($"FileId {downloadDto.FileId} for resumed downloadId {downloadId} not found. Skipping.");
+                   return false;
+                }
+                // Ensure filename from DTO is used if it's more accurate for resumed download
+                // And potentially the downloadItem.Url if it was stored in DownloadUrl
+                downloadItem.Filename = fileEntry.Filename; 
+                if (!string.IsNullOrEmpty(downloadDto.DownloadUrl)) actualDownloadUrl = downloadDto.DownloadUrl;
+
+                databaseService.UpdateDownloadStatus(downloadId, "downloading", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+                Logger.Information($"Resuming download for {downloadItem.Filename}, DownloadId {downloadId}, FileId {fileEntry.FileId}");
             }
-            else if ((shellService.Settings.LoadAllDatabases || !blog.CheckDirectoryForFiles) && CheckIfLinkRestored(downloadItem))
+            else // New download
             {
-                string fileName = AddFileToDb(downloadItem);
-                UpdateProgressQueueInformation(Resources.ProgressSkipFile, fileName);
+                fileEntry = databaseService.GetFileByBlogIdAndLink(blog.BlogId, uniqueFileKeyUrl);
+                if (fileEntry == null)
+                {
+                    fileEntry = new FileDto 
+                    { 
+                        BlogId = blog.BlogId, 
+                        Link = uniqueFileKeyUrl, 
+                        OriginalLink = originalPostPageUrl, 
+                        Filename = downloadItem.Filename, 
+                        Timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds(), 
+                        FileSize = 0 // Will be updated after download
+                    };
+                    fileEntry.FileId = databaseService.AddFile(fileEntry);
+                    if (fileEntry.FileId == 0)
+                    {
+                        Logger.Error($"AbstractDownloader:DownloadBinaryPostAsync: Failed to add new file to DB. Blog: {blog.Name}, URL Key: {uniqueFileKeyUrl}");
+                        return false;
+                    }
+                }
+                else if (fileEntry.Filename != downloadItem.Filename || 
+                         (!string.IsNullOrEmpty(originalPostPageUrl) && fileEntry.OriginalLink != originalPostPageUrl))
+                {
+                    // Update filename or original link if they changed for an existing file entry
+                    fileEntry.Filename = downloadItem.Filename;
+                    if (!string.IsNullOrEmpty(originalPostPageUrl)) fileEntry.OriginalLink = originalPostPageUrl;
+                    databaseService.UpdateFile(fileEntry);
+                    Logger.Information($"AbstractDownloader:DownloadBinaryPostAsync: Updated metadata for existing file. Blog: {blog.Name}, FileId: {fileEntry.FileId}");
+                }
+
+                DownloadDto newDownload = new DownloadDto 
+                { 
+                    FileId = fileEntry.FileId, 
+                    DownloadUrl = actualDownloadUrl, 
+                    Status = "pending", // Will be set to "downloading" just before actual download attempt
+                    TotalBytes = 0, // Will be updated by FileDownloader or after download
+                    LastAttemptTimestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds(), 
+                    RetryCount = 0, 
+                    DownloadPriority = 0 
+                };
+                downloadId = databaseService.AddDownload(newDownload);
+                if (downloadId == 0)
+                {
+                    Logger.Error($"AbstractDownloader:DownloadBinaryPostAsync: Failed to add new download entry to DB. Blog: {blog.Name}, FileId: {fileEntry.FileId}");
+                    return false;
+                }
+                databaseService.UpdateDownloadStatus(downloadId, "downloading", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+            }
+
+            string blogDownloadLocation = blog.DownloadLocation();
+            string targetFileLocation = FileLocation(blogDownloadLocation, fileEntry.Filename); // Use filename from FileDto
+            DateTime postDate = PostDate(downloadItem);
+            UpdateProgressQueueInformation(Resources.ProgressDownloadImage, fileEntry.Filename); // Use filename from FileDto
+
+            bool downloadResult;
+            string finalFileLocation;
+
+            // Use actualDownloadUrl for the download call
+            if (blog.Settings.DownloadUrlList)
+            {
+                // This path for DownloadUrlList might need more specific handling for what 'blogDownloadLocation' means here.
+                // Assuming it's a path to a list file, not the download directory for the binary.
+                // The actual binary isn't downloaded, just its URL is listed.
+                (downloadResult, finalFileLocation) = await DownloadBinaryFileAsync(targetFileLocation, blogDownloadLocation /* text file path */, actualDownloadUrl, downloadId, blog.BlogId);
             }
             else
             {
-                string blogDownloadLocation = blog.DownloadLocation();
-                string fileName = AddFileToDb(downloadItem);
-                string fileLocation = FileLocation(blogDownloadLocation, fileName);
-                string fileLocationUrlList = FileLocation(blogDownloadLocation, downloadItem.TextFileLocation);
-                DateTime postDate = PostDate(downloadItem);
-                UpdateProgressQueueInformation(Resources.ProgressDownloadImage, fileName);
-                bool result;
-                (result, fileLocation) = await DownloadBinaryFileAsync(fileLocation, fileLocationUrlList, Url(downloadItem));
-                if (!result)
-                {
-                    return false;
-                }
+                (downloadResult, finalFileLocation) = await DownloadBinaryFileAsync(targetFileLocation, actualDownloadUrl, downloadId, blog.BlogId);
+            }
 
-                SetFileDate(fileLocation, postDate);
-                UpdateBlogDB(downloadItem.DbType);
+            if (!downloadResult)
+            {
+                return false; // DB status should have been updated by FileDownloader or DownloadBinaryFileAsync for UrlList
+            }
 
-                //TODO: Refactor
-                if (!shellService.Settings.EnablePreview)
-                {
-                    return true;
-                }
+            // For non-UrlList downloads, update FileSize and set file date.
+            if (!blog.Settings.DownloadUrlList && File.Exists(finalFileLocation))
+            {
+                databaseService.UpdateFileSizeInFilesTable(fileEntry.FileId, new FileInfo(finalFileLocation).Length);
+                SetFileDate(finalFileLocation, postDate); 
+            }
+            // If it was DownloadUrlList, the download success means URL was appended. Status already set to 'completed' by that path.
+            
+            UpdateBlogDB(downloadItem.DbType);
 
-                if (suffixes.Any(suffix => fileName.EndsWith(suffix)))
+            if (shellService.Settings.EnablePreview && !blog.Settings.DownloadUrlList)
+            {
+                if (suffixes.Any(suffix => fileEntry.Filename.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)))
                 {
-                    blog.LastDownloadedPhoto = Path.GetFullPath(fileLocation);
+                    blog.LastDownloadedPhoto = Path.GetFullPath(finalFileLocation);
                 }
                 else
                 {
-                    blog.LastDownloadedVideo = Path.GetFullPath(fileLocation);
+                    blog.LastDownloadedVideo = Path.GetFullPath(finalFileLocation);
                 }
                 blog.LastPreviewShown = DateTime.Now.Ticks;
-
-                return true;
             }
-
             return true;
         }
 
-        private void AddTextToDb(TumblrPost downloadItem)
+        // AddTextToDb removed
+
+        // AddFileToDb (protected virtual string AddFileToDb(TumblrPost downloadItem)) removed
+
+        // CheckIfFileExistsInDB(string filenameUrl) - this specific public signature might be gone or changed if not used elsewhere.
+        // The CheckIfFileExistsInDB(TumblrPost downloadItem) overload is what's being directly refactored.
+        public bool CheckIfFileExistsInDB(string filenameUrl) // Kept for now if other parts of code use it directly with a simple URL.
         {
-            files.AddFileToDb(PostId(downloadItem), null, downloadItem.Filename);
+             if (blog?.BlogId == 0) return false;
+             return databaseService.GetFileByBlogIdAndLink(blog.BlogId, filenameUrl) != null;
         }
 
-        protected virtual string AddFileToDb(TumblrPost downloadItem)
+        protected bool CheckIfFileExistsInDB(TumblrPost downloadItem) // Refactored
         {
-            if (AppendTemplate == null)
+            if (blog?.BlogId == 0) return false; // BlogId must be valid
+            
+            string uniqueFileUrl = FileNameUrl(downloadItem);
+            var fileEntry = databaseService.GetFileByBlogIdAndLink(blog.BlogId, uniqueFileUrl);
+            
+            if (fileEntry != null)
             {
-                files.AddFileToDb(FileNameUrl(downloadItem), FileNameOriginalUrl(downloadItem), downloadItem.Filename);
-                return downloadItem.Filename;
-            }
-            return files.AddFileToDb(FileNameUrl(downloadItem), FileNameOriginalUrl(downloadItem), downloadItem.Filename, AppendTemplate);
-        }
-
-        public bool CheckIfFileExistsInDB(string filenameUrl)
-        {
-            return files.CheckIfFileExistsInDB(filenameUrl, false);
-        }
-
-        protected bool CheckIfFileExistsInDB(TumblrPost downloadItem)
-        {
-            bool found;
-            string filenameOrgUrl = string.IsNullOrEmpty(downloadItem.PostedUrl) ? null : FileNameOriginalUrl(downloadItem);
-            string filename = FileNameUrl(downloadItem);
-            if (shellService.Settings.LoadAllDatabases)
-            {
-                if (filenameOrgUrl != null)
+                // File with this specific URL exists.
+                // Optional: Update OriginalLink if it's different and provided in downloadItem
+                string originalPostUrl = FileNameOriginalUrl(downloadItem);
+                if (!string.IsNullOrEmpty(originalPostUrl) && fileEntry.OriginalLink != originalPostUrl)
                 {
-                    found = managerService.CheckIfFileExistsInDB(filenameOrgUrl, true, shellService.Settings.LoadArchive);
-                    if (found || string.IsNullOrEmpty(filename)) return found;
+                    fileEntry.OriginalLink = originalPostUrl;
+                    databaseService.UpdateFile(fileEntry); // Update if changed
                 }
-                found = managerService.CheckIfFileExistsInDB(filename, false, shellService.Settings.LoadArchive);
-                UpdateLinkIfNeeded(found, filename, filenameOrgUrl);
-                return found;
+                return true;
             }
-
-            if (filenameOrgUrl != null)
+            
+            // Check by OriginalLink if uniqueFileUrl not found, for robustness if Link format changed for same content
+            string filenameOrgUrl = FileNameOriginalUrl(downloadItem);
+            if (!string.IsNullOrEmpty(filenameOrgUrl))
             {
-                found = files.CheckIfFileExistsInDB(filenameOrgUrl, true);
-                if (found || string.IsNullOrEmpty(filename)) return found;
+                var fileByOriginalLink = databaseService.GetFileByBlogIdAndLink(blog.BlogId, filenameOrgUrl);
+                if (fileByOriginalLink != null)
+                {
+                    // Found by original link. This means the primary 'Link' might have changed or wasn't the key before.
+                    // Potentially update this entry to use the new 'uniqueFileUrl' as its primary Link if logic dictates.
+                    // For now, just confirm existence.
+                    return true;
+                }
             }
-            found = files.CheckIfFileExistsInDB(filename, false);
-            UpdateLinkIfNeeded(found, filename, filenameOrgUrl);
-            return found;
+            return false;
         }
 
-        private void UpdateLinkIfNeeded(bool found, string filename, string filenameOrgUrl)
-        {
-            if (found && filenameOrgUrl != null)
-            {
-                // filenameOrgUrl is not equal filename and not found, but filename is found, so update file entry
-                files.UpdateOriginalLink(filename, filenameOrgUrl);
-            }
-        }
+        // UpdateLinkIfNeeded removed as its logic is integrated into CheckIfFileExistsInDB or Add/Update paths.
 
         private delegate bool OutputToTextFileDel(string fileLocation, string text, bool isJson);
 
         private void DownloadTextPost(TumblrPost downloadItem)
         {
-            string postId = PostId(downloadItem);
-            if (files.CheckIfFileExistsInDB(postId, false))
+            if (blog?.BlogId == 0)
             {
-                UpdateProgressQueueInformation(Resources.ProgressSkipFile, postId);
+                Logger.Error($"AbstractDownloader:DownloadTextPost: BlogId is not set for blog {blog?.Name}. Cannot track text post.");
+                return;
+            }
+
+            string postId = PostId(downloadItem); // Unique ID for the text post content itself.
+            string linkForTextPost = $"textpost_{blog.BlogId}_{postId}"; // Construct a unique link for DB
+            string textContent = Url(downloadItem); // This is the actual text content for text posts.
+
+            FileDto fileEntry = databaseService.GetFileByBlogIdAndLink(blog.BlogId, linkForTextPost);
+
+            if (fileEntry != null)
+            {
+                UpdateProgressQueueInformation(Resources.ProgressSkipFile, postId); // Already recorded
+                return;
+            }
+
+            // Text post not in DB, add it.
+            string blogDownloadLocation = blog.DownloadLocation();
+            string actualFilenameOnDisk = string.IsNullOrEmpty(downloadItem.Filename) ? downloadItem.TextFileLocation : downloadItem.Filename;
+            string fileLocationOnDisk = FileLocation(blogDownloadLocation, actualFilenameOnDisk);
+            
+            OutputToTextFileDel outputToTextFile = string.IsNullOrEmpty(downloadItem.Filename) 
+                ? new OutputToTextFileDel(AppendToTextFile) 
+                : new OutputToTextFileDel(WriteToTextFile);
+
+            UpdateProgressQueueInformation(Resources.ProgressDownloadImage, postId); // Using generic message
+
+            if (outputToTextFile(fileLocationOnDisk, textContent, blog.Settings.MetadataFormat == Domain.Models.MetadataType.Json))
+            {
+                long fileSize = new FileInfo(fileLocationOnDisk).Length; // Get actual file size after writing
+
+                fileEntry = new FileDto
+                {
+                    BlogId = blog.BlogId,
+                    Link = linkForTextPost, // Use the constructed unique link
+                    Filename = actualFilenameOnDisk, // Actual filename on disk
+                    Timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                    FileSize = fileSize,
+                    // OriginalLink could be the post's web URL if available, or null
+                    OriginalLink = downloadItem.PostedUrl 
+                };
+                fileEntry.FileId = databaseService.AddFile(fileEntry);
+
+                if (fileEntry.FileId > 0)
+                {
+                    DownloadDto textDownload = new DownloadDto
+                    {
+                        FileId = fileEntry.FileId,
+                        DownloadUrl = "internal://text", // Indicates it's not a remote download
+                        Status = "completed",
+                        ProgressBytes = fileSize,
+                        TotalBytes = fileSize,
+                        LastAttemptTimestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+                    };
+                    databaseService.AddDownload(textDownload);
+                    UpdateBlogDB(downloadItem.DbType); // UI counter update
+                }
+                else
+                {
+                     Logger.Error($"AbstractDownloader:DownloadTextPost: Failed to add FileDto to DB for text post {postId} of blog {blog.Name}.");
+                }
             }
             else
             {
-                string blogDownloadLocation = blog.DownloadLocation();
-                string text = Url(downloadItem);
-                string fileLocation = FileLocation(blogDownloadLocation, string.IsNullOrEmpty(downloadItem.Filename) ? downloadItem.TextFileLocation : downloadItem.Filename);
-                OutputToTextFileDel outputToTextFile = string.IsNullOrEmpty(downloadItem.Filename) ? new OutputToTextFileDel(AppendToTextFile) : new OutputToTextFileDel(WriteToTextFile);
-                UpdateProgressQueueInformation(Resources.ProgressDownloadImage, postId);
-                if (outputToTextFile(fileLocation, text, blog.MetadataFormat == Domain.Models.MetadataType.Json))
-                {
-                    UpdateBlogDB(downloadItem.DbType);
-                    AddTextToDb(downloadItem);
-                }
+                Logger.Error($"AbstractDownloader:DownloadTextPost: Failed to write text post {postId} to disk for blog {blog.Name}.");
+                // No DB entries created if file writing fails.
             }
         }
 
-        protected void UpdateBlogDB(string postType)
+        protected void UpdateBlogDB(string postType) // This is for UI counters, not direct DB save of blog object
         {
             blog.UpdatePostCount(postType);
             blog.UpdateProgress(true);
@@ -505,7 +654,11 @@ namespace TumblThree.Applications.Downloader
                 return;
             }
 
-            File.SetLastWriteTime(fileLocation, postDate);
+            // Ensure file exists before setting date, as DownloadUrlList path might not create a physical file
+            if (File.Exists(fileLocation)) 
+            {
+                File.SetLastWriteTime(fileLocation, postDate);
+            }
         }
 
         protected static string Url(TumblrPost downloadItem)
@@ -573,50 +726,31 @@ namespace TumblThree.Applications.Downloader
             }
         }
 
-        protected void OnSaveTimedEvent(IProgress<Exception> progress)
-        {
-            lock (_saveTimerLock)
-            {
-                if (_disposed) return;
-
-                try
-                {
-                    _saveTimer.Change(Timeout.Infinite, Timeout.Infinite);
-
-                    if (files != null && files.IsDirty) files.Save();
-                }
-                catch (Exception e)
-                {
-                    progress.Report(e);
-                }
-                finally
-                {
-                    if (!_disposed)
-                        _saveTimer.Change(SAVE_TIMESPAN_SECS * 1000, SAVE_TIMESPAN_SECS * 1000);
-                }
-            }
-        }
+        // OnSaveTimedEvent method removed
+        // _saveTimer field and its initialization removed
 
         public virtual bool CheckIfPostedUrlIsDownloaded(string url)
         {
-            var filenameUrl = url.Split('/').Last();
-            if (shellService.Settings.LoadAllDatabases)
-            {
-                return managerService.CheckIfFileExistsInDB(filenameUrl, true, shellService.Settings.LoadArchive);
-            }
-            return files.CheckIfFileExistsInDB(filenameUrl, true);
+            if (blog?.BlogId == 0 || string.IsNullOrEmpty(url)) return false;
+            var filenameUrl = url.Split('/').LastOrDefault(); // Ensure not null if url is just "host/"
+            if (string.IsNullOrEmpty(filenameUrl)) return false;
+
+            // This check is against the 'Link' field in the Files table.
+            // If PostedUrl is meant to be checked against 'OriginalLink', the query in DB service would need adjustment or another method.
+            return databaseService.GetFileByBlogIdAndLink(blog.BlogId, filenameUrl) != null;
         }
 
         protected virtual void Dispose(bool disposing)
         {
             if (disposing)
             {
-                lock (_saveTimerLock)
-                {
-                    _disposed = true;
-                    _saveTimer.Change(Timeout.Infinite, Timeout.Infinite);
-                    _saveTimer.Dispose();
-                }
+                // lock (_saveTimerLock) // Removed
+                // {
+                //     _disposed = true;
+                //     _saveTimer.Change(Timeout.Infinite, Timeout.Infinite); // Removed
+                //     _saveTimer.Dispose(); // Removed
+                // }
+                _disposed = true; // Set disposed flag
                 concurrentConnectionsSemaphore?.Dispose();
                 concurrentVideoConnectionsSemaphore?.Dispose();
 

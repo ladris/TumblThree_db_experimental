@@ -3,41 +3,31 @@ using System.Threading;
 using TumblThree.Applications.DataModels;
 using TumblThree.Applications.DataModels.TumblrPosts;
 using TumblThree.Applications.Services;
+using TumblThree.Domain.Database; // Added
 using TumblThree.Domain.Models.Blogs;
-using TumblThree.Domain.Models.Files;
+//using TumblThree.Domain.Models.Files; // Removed
 
 namespace TumblThree.Applications.Downloader
 {
     public class NewTumblDownloader : AbstractDownloader
     {
         public NewTumblDownloader(IShellService shellService, IManagerService managerService, CancellationToken ct, PauseToken pt, IProgress<DownloadProgress> progress,
-            IPostQueue<AbstractPost> postQueue, FileDownloader fileDownloader, ICrawlerService crawlerService = null, IBlog blog = null, IFiles files = null)
-            : base(shellService, managerService, ct, pt, progress, postQueue, fileDownloader, crawlerService, blog, files)
+            IPostQueue<AbstractPost> postQueue, FileDownloader fileDownloader, DatabaseService databaseService, /* Added */
+            ICrawlerService crawlerService = null, IBlog blog = null /* IFiles files = null Removed */)
+            : base(shellService, managerService, ct, pt, progress, postQueue, fileDownloader, databaseService, crawlerService, blog) // Pass databaseService, files removed
         {
         }
 
-        protected new string AddFileToDb(TumblrPost downloadItem)
-        {
-            // url filenames are unique and can't identify duplicates, so use mediaIx for now
+        // AddFileToDb and CheckIfFileExistsInDB are removed from AbstractDownloader and its derivatives.
+        // The logic is now centralized in AbstractDownloader using DatabaseService.
+        // If NewTumblDownloader had specific overrides for these, that logic needs to be
+        // re-evaluated:
+        // - Does it need to influence how FileDto is created in AbstractDownloader.DownloadBinaryPostAsync?
+        // - Does it need a different way of checking file existence? (The DB check is by Link)
 
-            if (AppendTemplate == null)
-            {
-                files.AddFileToDb(FileNameUrl(downloadItem), "", downloadItem.Filename);
-                return downloadItem.Filename;
-            }
-            return files.AddFileToDb(FileNameUrl(downloadItem), "", downloadItem.Filename, AppendTemplate);
-        }
-
-        protected new bool CheckIfFileExistsInDB(TumblrPost downloadItem)
-        {
-            string filename = FileNameUrl(downloadItem);
-            if (shellService.Settings.LoadAllDatabases)
-            {
-                return managerService.CheckIfFileExistsInDB(filename, false, shellService.Settings.LoadArchive);
-            }
-
-            return files.CheckIfFileExistsInDB(filename, false);
-        }
+        // The old AddFileToDb used FileNameUrl (m<ID>) as the Link, and "" as OriginalLink.
+        // The old CheckIfFileExistsInDB used FileNameUrl (m<ID>) as the Link.
+        // This specific URL generation is kept in FileNameUrl.
 
         protected override string FileNameUrl(TumblrPost downloadItem)
         {
