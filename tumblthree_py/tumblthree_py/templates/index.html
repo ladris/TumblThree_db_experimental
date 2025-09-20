@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TumblThree Python</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <h1>TumblThree Python</h1>
+    <a href="/settings">Settings</a>
+
+    <h2>Add Blog</h2>
+    <form id="add-blog-form">
+        <label for="name">Name:</label>
+        <input type="text" id="name" name="name" required>
+        <label for="url">URL:</label>
+        <input type="url" id="url" name="url" required>
+        <button type="submit">Add Blog</button>
+    </form>
+
+    <h2>Blogs</h2>
+    <table id="blogs-table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>URL</th>
+                <th>Last Crawled</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Blog rows will be inserted here by JavaScript -->
+        </tbody>
+    </table>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
