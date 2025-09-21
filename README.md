@@ -6,7 +6,7 @@ The application provides a web interface to manage a list of blogs to be crawled
 
 ## Project Status
 
-This project is currently under development. For a detailed overview of the implemented features and the road map for future development, please see the [TODO.md](tumblthree_py/TODO.md) file.
+This project is currently under development. For a detailed overview of the implemented features and the road map for future development, please see the [TODO.md](TODO.md) file.
 
 ## How to Run the Application
 
@@ -27,6 +27,9 @@ This project is currently under development. For a detailed overview of the impl
 2.  **Install Python dependencies:**
     It is recommended to use a virtual environment.
     ```bash
+    # Navigate to the application directory
+    cd tumblthree_py
+
     # Create and activate a virtual environment
     python3 -m venv venv
     source venv/bin/activate
@@ -45,19 +48,19 @@ This project is currently under development. For a detailed overview of the impl
         export DATABASE_URI="mysql+mysqlconnector://user:password@localhost/tumblthree"
         ```
         Replace `user` and `password` with your MySQL credentials.
-    -   You can also set the `CELERY_BROKER_URL` and `CELERY_RESULT_BACKEND` environment variables if your Redis server is not running on the default port.
+    -   You can also set `CELERY_BROKER_URL` and `CELERY_RESULT_BACKEND` if your Redis server is not running on the default port.
 
 ### Running the Application
 
 1.  **Run the Flask application**:
-    *   Open a terminal and run the following command from the `tumblthree_py` directory:
+    *   Open a terminal, navigate to the `tumblthree_py` directory, and run:
         ```bash
         python3 app.py
         ```
     *   The web server will start on `http://127.0.0.1:5000`.
 
 2.  **Run the Celery worker**:
-    *   Open a new terminal and run the following command from the `tumblthree_py` directory:
+    *   Open a new terminal, navigate to the `tumblthree_py` directory, and run:
         ```bash
         celery -A app.celery worker --loglevel=info
         ```
