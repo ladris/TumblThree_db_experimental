@@ -22,8 +22,8 @@ def create_app():
     db.init_app(app)
 
     with app.app_context():
-        if not os.path.exists(db_path):
-            print("Database not found, creating it.")
+        if not db.engine.dialect.has_table(db.engine.connect(), "blog"):
+            print("Blog table not found, creating all tables.")
             db.create_all()
 
     # initialize scheduler
