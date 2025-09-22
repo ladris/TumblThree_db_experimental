@@ -44,7 +44,7 @@
                 <td><a href="{{ blog.url }}" target="_blank">{{ blog.url }}</a></td>
                 <td>{{ blog.status }}</td>
                 <td>{{ "%.2f"|format(blog.progress|float) }}%</td>
-                <td>{{ blog.posts.count() }} / {{ blog.posts_total }}</td>
+                <td>{{ blog.posts | length }} / {{ blog.posts_total }}</td>
                 <td>
                     <a href="{{ url_for('crawl_route', blog_id=blog.id) }}">Crawl</a> |
                     <a href="{{ url_for('settings', blog_id=blog.id) }}">Settings</a> |
