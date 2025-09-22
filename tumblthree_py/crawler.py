@@ -1,5 +1,6 @@
 import requests
 import json
+import os
 from .models import db, Blog, File
 
 class TumblrCrawler:
@@ -28,12 +29,48 @@ class TumblrCrawler:
         # For now, let's just try to get the first page.
         self._crawl_page(0)
 
-        # 3. TODO: Implement downloader to process the download_queue.
-        print(f"Download queue for {self.blog.name}:")
-        for item in self.download_queue:
-            print(item)
+        # 3. Download files.
+        self._process_download_queue()
 
         print(f"Finished crawling blog: {self.blog.name}")
+
+    def _process_download_queue(self):
+        """Processes the download queue."""
+        download_dir = os.path.join('tumblthree_py', 'downloads', self.blog.name)
+        os.makedirs(download_dir, exist_ok=True)
+
+        for item_type, data in self.download_queue:
+            if item_type == 'url':
+                self._download_file(data, download_dir)
+            elif item_type == 'text':
+                filename = f"{data['id']}.txt"
+                self._save_file(filename, data['body'], download_dir, link=f"text_post_{data['id']}")
+
+    def _save_file(self, filename, content, download_dir, link):
+        """Saves content to a file."""
+        filepath = os.path.join(download_dir, filename)
+        try:
+            with open(filepath, 'wb' if isinstance(content, bytes) else 'w') as f:
+                f.write(content)
+
+            # Add file to the database
+            new_file = File(blog_id=self.blog.id, link=link, filename=filename)
+            db.session.add(new_file)
+            db.session.commit()
+
+            print(f"Saved: {filename}")
+        except IOError as e:
+            print(f"Error saving file {filepath}: {e}")
+
+    def _download_file(self, url, download_dir):
+        """Downloads a file from a URL."""
+        try:
+            response = requests.get(url, stream=True)
+            response.raise_for_status()
+            filename = url.split('/')[-1].split('?')[0]
+            self._save_file(filename, response.content, download_dir, url)
+        except requests.RequestException as e:
+            print(f"Error downloading {url}: {e}")
 
     def _get_api_url(self, start=0):
         """Constructs the API URL for the blog."""
@@ -77,12 +114,15 @@ class TumblrCrawler:
             post_type = post.get('type')
             if post_type == 'photo':
                 for photo in post.get('photos', []):
-                    self.download_queue.append(photo['original_size']['url'])
+                    self.download_queue.append(('url', photo['original_size']['url']))
             elif post_type == 'video':
-                # This might need more sophisticated parsing to get the best quality.
                 if 'video_url' in post:
-                    self.download_queue.append(post['video_url'])
+                    self.download_queue.append(('url', post['video_url']))
                 elif 'permalink_url' in post:
-                    # Fallback for some video types
-                    self.download_queue.append(post['permalink_url'])
-            # TODO: Add support for other post types (audio, text, etc.)
+                    self.download_queue.append(('url', post['permalink_url']))
+            elif post_type == 'audio':
+                if 'audio_url' in post:
+                    self.download_queue.append(('url', post['audio_url']))
+            elif post_type == 'text':
+                if 'body' in post:
+                    self.download_queue.append(('text', {'id': post['id'], 'body': post['body']}))

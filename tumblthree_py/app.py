@@ -144,7 +144,17 @@ def create_app():
         from .models import File
         file = File.query.get_or_404(file_id)
         blog_id = file.blog_id
-        # TODO: Delete the actual file from disk
+
+        # Delete the actual file from disk
+        try:
+            filepath = os.path.join('tumblthree_py', 'downloads', file.blog.name, file.filename)
+            os.remove(filepath)
+            print(f"Deleted file: {filepath}")
+        except FileNotFoundError:
+            print(f"File not found, could not delete: {filepath}")
+        except Exception as e:
+            print(f"Error deleting file {filepath}: {e}")
+
         db.session.delete(file)
         db.session.commit()
         return redirect(url_for('gallery', blog_id=blog_id))
