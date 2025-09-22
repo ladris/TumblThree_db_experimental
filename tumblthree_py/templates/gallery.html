@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>Gallery for {{ blog.name }}</title>
+    <style>
+        body { font-family: sans-serif; }
+        .container { width: 80%; margin: auto; }
+        .gallery { display: flex; flex-wrap: wrap; }
+        .thumbnail { border: 1px solid #ddd; margin: 10px; padding: 10px; text-align: center; }
+        .thumbnail img { max-width: 200px; max-height: 200px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Gallery for {{ blog.name }}</h1>
+        <div class="gallery">
+            {% for file in blog.files %}
+                {% if file.status == 'active' %}
+                <div class="thumbnail">
+                    <p>{{ file.filename }}</p>
+                    <form action="{{ url_for('archive_file', file_id=file.id) }}" method="post" style="display: inline;">
+                        <input type="submit" value="Archive">
+                    </form>
+                    <form action="{{ url_for('delete_file', file_id=file.id) }}" method="post" style="display: inline;">
+                        <input type="submit" value="Delete">
+                    </form>
+                </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+        <h2>Archived Files</h2>
+        <div class="gallery">
+            {% for file in blog.files %}
+                {% if file.status == 'archived' %}
+                <div class="thumbnail">
+                    <p>{{ file.filename }}</p>
+                </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+        <p><a href="{{ url_for('index') }}">Back to dashboard</a></p>
+    </div>
+</body>
+</html>

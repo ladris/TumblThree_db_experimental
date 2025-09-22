@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>TumblThree-py</title>
+    <style>
+        body { font-family: sans-serif; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <h1>TumblThree-py</h1>
+    <h2>Blogs</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>URL</th>
+                <th>Status</th>
+                <th>Total Posts</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for blog in blogs %}
+            <tr>
+                <td>{{ blog.name }}</td>
+                <td><a href="{{ blog.url }}" target="_blank">{{ blog.url }}</a></td>
+                <td>{{ blog.status }}</td>
+                <td>{{ blog.total_count }}</td>
+                <td>
+                    <a href="{{ url_for('crawl_route', blog_id=blog.id) }}">Crawl</a> |
+                    <a href="{{ url_for('settings', blog_id=blog.id) }}">Settings</a> |
+                    <a href="{{ url_for('gallery', blog_id=blog.id) }}">Gallery</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h2>Add New Blog</h2>
+    <form action="{{ url_for('add_blog') }}" method="post">
+        <label for="name">Name:</label><br>
+        <input type="text" id="name" name="name" required><br>
+        <label for="url">URL:</label><br>
+        <input type="url" id="url" name="url" required><br><br>
+        <input type="submit" value="Add Blog">
+    </form>
+</body>
+</html>

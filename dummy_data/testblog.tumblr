@@ -1,0 +1,12 @@
+{
+  "Name": "testblog",
+  "Url": "https://testblog.tumblr.com",
+  "BlogType": "tumblr",
+  "OriginalBlogType": "tumblr",
+  "Version": "4",
+  "DownloadPhoto": true,
+  "DownloadVideo": true,
+  "DateAdded": "/Date(1672531200000)/",
+  "TotalCount": 10,
+  "DownloadedPhotos": 5
+}
