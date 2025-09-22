@@ -141,7 +141,7 @@ def create_app():
             blog = Blog.query.get(blog_id)
             if blog:
                 log_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs', f'{blog.name}.log')
-                with open(log_file_path, 'w') as log_file:
+                with open(log_file_path, 'w', encoding='utf-8') as log_file:
                     # Redirect stdout and stderr to the log file
                     original_stdout = sys.stdout
                     original_stderr = sys.stderr
