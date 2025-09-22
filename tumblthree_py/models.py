@@ -1,104 +1,152 @@
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.dialects.sqlite import JSON
 
 db = SQLAlchemy()
 
+# Association table for the many-to-many relationship between posts and tags
+post_tags = db.Table('post_tags',
+    db.Column('post_id', db.Integer, db.ForeignKey('post.id'), primary_key=True),
+    db.Column('tag_id', db.Integer, db.ForeignKey('tag.id'), primary_key=True)
+)
+
+class TumblrCredential(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    consumer_key = db.Column(db.String(255), nullable=False)
+    consumer_secret = db.Column(db.String(255), nullable=False)
+    access_token = db.Column(db.String(255), nullable=False)
+    access_token_secret = db.Column(db.String(255), nullable=False)
+
 class Blog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    uuid = db.Column(db.String(255), nullable=False, unique=True)
     name = db.Column(db.String(255), nullable=False, unique=True)
     url = db.Column(db.String(255), nullable=False)
-    location = db.Column(db.String(255))
-    child_id = db.Column(db.String(255))
-    blog_type = db.Column(db.String(50))
-    original_blog_type = db.Column(db.String(50))
-    version = db.Column(db.String(50))
-    description = db.Column(db.Text)
     title = db.Column(db.String(255))
-    last_id = db.Column(db.BigInteger)
-    notes = db.Column(db.Text)
-    tags = db.Column(db.Text)
-    rating = db.Column(db.Integer, default=0)
-    total_count = db.Column(db.Integer, default=0)
-    posts = db.Column(db.Integer, default=0)
-    texts = db.Column(db.Integer, default=0)
-    answers = db.Column(db.Integer, default=0)
-    quotes = db.Column(db.Integer, default=0)
-    photos = db.Column(db.Integer, default=0)
-    number_of_links = db.Column(db.Integer, default=0)
-    conversations = db.Column(db.Integer, default=0)
-    videos = db.Column(db.Integer, default=0)
-    audios = db.Column(db.Integer, default=0)
-    photo_metas = db.Column(db.Integer, default=0)
-    video_metas = db.Column(db.Integer, default=0)
-    audio_metas = db.Column(db.Integer, default=0)
-    downloaded_texts = db.Column(db.Integer, default=0)
-    downloaded_quotes = db.Column(db.Integer, default=0)
-    downloaded_photos = db.Column(db.Integer, default=0)
-    downloaded_links = db.Column(db.Integer, default=0)
-    downloaded_answers = db.Column(db.Integer, default=0)
-    downloaded_conversations = db.Column(db.Integer, default=0)
-    downloaded_videos = db.Column(db.Integer, default=0)
-    downloaded_audios = db.Column(db.Integer, default=0)
-    downloaded_photo_metas = db.Column(db.Integer, default=0)
-    downloaded_video_metas = db.Column(db.Integer, default=0)
-    downloaded_audio_metas = db.Column(db.Integer, default=0)
-    duplicate_photos = db.Column(db.Integer, default=0)
-    duplicate_videos = db.Column(db.Integer, default=0)
-    duplicate_audios = db.Column(db.Integer, default=0)
-    download_text = db.Column(db.Boolean, default=False)
-    download_quote = db.Column(db.Boolean, default=False)
+    description = db.Column(db.Text)
+
+    # From API /info
+    ask = db.Column(db.Boolean)
+    ask_anon = db.Column(db.Boolean)
+    followed = db.Column(db.Boolean)
+    likes = db.Column(db.Integer)
+    is_blocked_from_primary = db.Column(db.Boolean)
+
+    posts_total = db.Column(db.Integer) # 'posts' in API
+    updated = db.Column(db.BigInteger)
+
+    # App-specific fields
+    last_id = db.Column(db.BigInteger) # for incremental crawling
+    last_complete_crawl = db.Column(db.DateTime)
+    status = db.Column(db.String(50), default='idle')  # idle, crawling, finished, error
+    progress = db.Column(db.Integer, default=0)
+
+    # Relationships
+    posts = db.relationship('Post', backref='blog', lazy=True, cascade="all, delete-orphan")
+
+    # Download settings
     download_photo = db.Column(db.Boolean, default=True)
-    download_link = db.Column(db.Boolean, default=False)
-    download_answer = db.Column(db.Boolean, default=False)
-    download_conversation = db.Column(db.Boolean, default=False)
     download_video = db.Column(db.Boolean, default=True)
     download_audio = db.Column(db.Boolean, default=True)
-    create_photo_meta = db.Column(db.Boolean, default=False)
-    create_video_meta = db.Column(db.Boolean, default=False)
-    create_audio_meta = db.Column(db.Boolean, default=False)
-    download_replies = db.Column(db.Boolean, default=False)
-    download_reblogged_posts = db.Column(db.Boolean, default=False)
-    download_url_list = db.Column(db.Boolean, default=False)
-    dump_crawler_data = db.Column(db.Boolean, default=False)
-    reg_ex_photos = db.Column(db.Boolean, default=False)
-    reg_ex_videos = db.Column(db.Boolean, default=False)
-    skip_gif = db.Column(db.Boolean, default=False)
-    download_video_thumbnail = db.Column(db.Boolean, default=False)
-    force_size = db.Column(db.Boolean, default=False)
-    force_rescan = db.Column(db.Boolean, default=False)
-    check_directory_for_files = db.Column(db.Boolean, default=False)
-    group_photo_sets = db.Column(db.Boolean, default=False)
-    save_texts_individual_files = db.Column(db.Boolean, default=False)
-    zip_crawler_data = db.Column(db.Boolean, default=False)
-    download_imgur = db.Column(db.Boolean, default=False)
-    download_webmshare = db.Column(db.Boolean, default=False)
-    download_uguu = db.Column(db.Boolean, default=False)
-    download_cat_box = db.Column(db.Boolean, default=False)
-    webmshare_type = db.Column(db.String(50))
-    uguu_type = db.Column(db.String(50))
-    cat_box_type = db.Column(db.String(50))
-    pnj_download_format = db.Column(db.String(50))
-    metadata_format = db.Column(db.String(50))
-    download_pages = db.Column(db.String(255))
-    page_size = db.Column(db.Integer, default=50)
-    download_from = db.Column(db.String(255))
-    download_to = db.Column(db.String(255))
-    password = db.Column(db.String(255))
-    filename_template = db.Column(db.String(255), default="%f")
-    date_added = db.Column(db.DateTime)
-    last_complete_crawl = db.Column(db.DateTime)
-    latest_post = db.Column(db.DateTime)
-    online = db.Column(db.Boolean, default=False)
-    settings_tab_index = db.Column(db.Integer, default=0)
-    progress = db.Column(db.Integer, default=0)
-    collection_id = db.Column(db.Integer, default=0)
-    status = db.Column(db.String(50), default='idle') # idle, crawling, finished, error
+    download_text = db.Column(db.Boolean, default=True)
+    download_quote = db.Column(db.Boolean, default=True)
+    download_link = db.Column(db.Boolean, default=True)
+    download_chat = db.Column(db.Boolean, default=True)
+    download_answer = db.Column(db.Boolean, default=True)
 
-    files = db.relationship('File', backref='blog', lazy=True, cascade="all, delete-orphan")
+class Post(db.Model):
+    id = db.Column(db.BigInteger, primary_key=True, autoincrement=False) # Use Tumblr's post ID
+    blog_id = db.Column(db.Integer, db.ForeignKey('blog.id'), nullable=False)
+
+    # Common post fields from API
+    post_url = db.Column(db.String(255), nullable=False)
+    type = db.Column(db.String(50), nullable=False)
+    timestamp = db.Column(db.BigInteger, nullable=False)
+    date = db.Column(db.String(255))
+    format = db.Column(db.String(50))
+    reblog_key = db.Column(db.String(255))
+    note_count = db.Column(db.Integer)
+
+    # NPF data
+    npf_data = db.Column(JSON)
+
+    # Relationships
+    tags = db.relationship('Tag', secondary=post_tags, lazy='subquery',
+                           backref=db.backref('posts', lazy=True))
+    files = db.relationship('File', backref='post', lazy=True, cascade="all, delete-orphan")
+
+    # Polymorphic relationship for different post types
+    __mapper_args__ = {
+        'polymorphic_identity': 'post',
+        'polymorphic_on': type
+    }
+
+class TextPost(Post):
+    __tablename__ = 'text_post'
+    id = db.Column(db.BigInteger, db.ForeignKey('post.id'), primary_key=True)
+    title = db.Column(db.String(255))
+    body = db.Column(db.Text)
+    __mapper_args__ = {'polymorphic_identity': 'text'}
+
+class PhotoPost(Post):
+    __tablename__ = 'photo_post'
+    id = db.Column(db.BigInteger, db.ForeignKey('post.id'), primary_key=True)
+    caption = db.Column(db.Text)
+    __mapper_args__ = {'polymorphic_identity': 'photo'}
+
+class QuotePost(Post):
+    __tablename__ = 'quote_post'
+    id = db.Column(db.BigInteger, db.ForeignKey('post.id'), primary_key=True)
+    text = db.Column(db.Text)
+    source = db.Column(db.Text)
+    __mapper_args__ = {'polymorphic_identity': 'quote'}
+
+class LinkPost(Post):
+    __tablename__ = 'link_post'
+    id = db.Column(db.BigInteger, db.ForeignKey('post.id'), primary_key=True)
+    title = db.Column(db.String(255))
+    url = db.Column(db.String(255))
+    description = db.Column(db.Text)
+    __mapper_args__ = {'polymorphic_identity': 'link'}
+
+class ChatPost(Post):
+    __tablename__ = 'chat_post'
+    id = db.Column(db.BigInteger, db.ForeignKey('post.id'), primary_key=True)
+    title = db.Column(db.String(255))
+    body = db.Column(db.Text)
+    dialogue = db.Column(JSON)
+    __mapper_args__ = {'polymorphic_identity': 'chat'}
+
+class AudioPost(Post):
+    __tablename__ = 'audio_post'
+    id = db.Column(db.BigInteger, db.ForeignKey('post.id'), primary_key=True)
+    caption = db.Column(db.Text)
+    player = db.Column(db.Text)
+    plays = db.Column(db.Integer)
+    __mapper_args__ = {'polymorphic_identity': 'audio'}
+
+class VideoPost(Post):
+    __tablename__ = 'video_post'
+    id = db.Column(db.BigInteger, db.ForeignKey('post.id'), primary_key=True)
+    caption = db.Column(db.Text)
+    player = db.Column(JSON)
+    __mapper_args__ = {'polymorphic_identity': 'video'}
+
+class AnswerPost(Post):
+    __tablename__ = 'answer_post'
+    id = db.Column(db.BigInteger, db.ForeignKey('post.id'), primary_key=True)
+    asking_name = db.Column(db.String(255))
+    asking_url = db.Column(db.String(255))
+    question = db.Column(db.Text)
+    answer = db.Column(db.Text)
+    __mapper_args__ = {'polymorphic_identity': 'answer'}
+
+class Tag(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(255), nullable=False, unique=True)
 
 class File(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    blog_id = db.Column(db.Integer, db.ForeignKey('blog.id'), nullable=False)
-    link = db.Column(db.Text, nullable=False)
-    original_link = db.Column(db.Text)
+    post_id = db.Column(db.BigInteger, db.ForeignKey('post.id'), nullable=False)
+    url = db.Column(db.Text, nullable=False)
     filename = db.Column(db.Text, nullable=False)
-    status = db.Column(db.String(20), default='active', nullable=False)  # active, archived, deleted
+    status = db.Column(db.String(20), default='downloaded', nullable=False) # downloaded, archived, deleted

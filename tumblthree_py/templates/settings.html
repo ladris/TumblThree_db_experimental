@@ -3,32 +3,45 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <title>Settings for {{ blog.name }}</title>
+    <title>Settings for {{ blog.name }} - TumblThree-py</title>
     <style>
         body { font-family: sans-serif; }
         .container { width: 80%; margin: auto; }
-        .form-group { margin-bottom: 1rem; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Settings for {{ blog.name }}</h1>
         <form action="{{ url_for('settings', blog_id=blog.id) }}" method="post">
-            <div class="form-group">
-                <label for="download_photo">Download Photos</label>
-                <input type="checkbox" id="download_photo" name="download_photo" {% if blog.download_photo %}checked{% endif %}>
-            </div>
-            <div class="form-group">
-                <label for="download_video">Download Videos</label>
-                <input type="checkbox" id="download_video" name="download_video" {% if blog.download_video %}checked{% endif %}>
-            </div>
-            <div class="form-group">
-                <label for="tags">Tags (comma-separated)</label>
-                <input type="text" id="tags" name="tags" value="{{ blog.tags or '' }}">
-            </div>
+            <h2>Download Settings</h2>
+            <input type="checkbox" id="download_photo" name="download_photo" {% if blog.download_photo %}checked{% endif %}>
+            <label for="download_photo">Download Photos</label><br>
+
+            <input type="checkbox" id="download_video" name="download_video" {% if blog.download_video %}checked{% endif %}>
+            <label for="download_video">Download Videos</label><br>
+
+            <input type="checkbox" id="download_audio" name="download_audio" {% if blog.download_audio %}checked{% endif %}>
+            <label for="download_audio">Download Audio</label><br>
+
+            <input type="checkbox" id="download_text" name="download_text" {% if blog.download_text %}checked{% endif %}>
+            <label for="download_text">Download Text Posts</label><br>
+
+            <input type="checkbox" id="download_quote" name="download_quote" {% if blog.download_quote %}checked{% endif %}>
+            <label for="download_quote">Download Quote Posts</label><br>
+
+            <input type="checkbox" id="download_link" name="download_link" {% if blog.download_link %}checked{% endif %}>
+            <label for="download_link">Download Link Posts</label><br>
+
+            <input type="checkbox" id="download_chat" name="download_chat" {% if blog.download_chat %}checked{% endif %}>
+            <label for="download_chat">Download Chat Posts</label><br>
+
+            <input type="checkbox" id="download_answer" name="download_answer" {% if blog.download_answer %}checked{% endif %}>
+            <label for="download_answer">Download Answer Posts</label><br>
+
+            <br>
             <input type="submit" value="Save Settings">
         </form>
-        <p><a href="{{ url_for('index') }}">Back to dashboard</a></p>
+        <p><a href="{{ url_for('index') }}">Back to Blog List</a></p>
     </div>
 </body>
 </html>

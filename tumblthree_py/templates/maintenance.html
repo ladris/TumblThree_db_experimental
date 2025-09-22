@@ -1,27 +1,50 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Maintenance</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>Maintenance - TumblThree-py</title>
+    <style>
+        body { font-family: sans-serif; }
+        .container { width: 80%; margin: auto; }
+        .form-group { margin-bottom: 1rem; }
+    </style>
 </head>
 <body>
-    <h1>Maintenance</h1>
+    <div class="container">
+        <h1>Maintenance</h1>
 
-    <h2>Database Initialization</h2>
-    <p>This will create the database tables. Use this if you are setting up the application for the first time or if you want to reset the database.</p>
-    <form action="{{ url_for('init_db_route') }}" method="post">
-        <button type="submit">Initialize Database</button>
-    </form>
+        <h2>API Credentials</h2>
+        <form action="{{ url_for('update_credentials') }}" method="post">
+            <div class="form-group">
+                <label for="consumer_key">Consumer Key:</label><br>
+                <input type="text" id="consumer_key" name="consumer_key" value="{{ credential.consumer_key if credential else '' }}" size="50">
+            </div>
+            <div class="form-group">
+                <label for="consumer_secret">Consumer Secret:</label><br>
+                <input type="text" id="consumer_secret" name="consumer_secret" value="{{ credential.consumer_secret if credential else '' }}" size="50">
+            </div>
+            <div class="form-group">
+                <label for="access_token">Access Token:</label><br>
+                <input type="text" id="access_token" name="access_token" value="{{ credential.access_token if credential else '' }}" size="50">
+            </div>
+            <div class="form-group">
+                <label for="access_token_secret">Access Token Secret:</label><br>
+                <input type="text" id="access_token_secret" name="access_token_secret" value="{{ credential.access_token_secret if credential else '' }}" size="50">
+            </div>
+            <input type="submit" value="Save Credentials">
+        </form>
 
-    <h2>Data Migration</h2>
-    <p>This will migrate data from the old TumblThree JSON files. Enter the path to the directory containing the JSON files.</p>
-    <form action="{{ url_for('migrate_route') }}" method="post">
-        <label for="path">Path to data:</label>
-        <input type="text" id="path" name="path" size="50">
-        <button type="submit">Migrate Data</button>
-    </form>
+        <hr>
 
-    <br>
-    <a href="{{ url_for('index') }}">Back to Dashboard</a>
+        <h2>Database Actions</h2>
+        <form action="{{ url_for('init_db_route') }}" method="post" style="display: inline;">
+            <input type="submit" value="Initialize Database" onclick="return confirm('Are you sure you want to re-initialize the database? This will delete all existing data.')">
+        </form>
+
+        <hr>
+
+        <p><a href="{{ url_for('index') }}">Back to Blog List</a></p>
+    </div>
 </body>
 </html>

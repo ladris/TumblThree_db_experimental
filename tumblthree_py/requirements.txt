@@ -1,0 +1,6 @@
+Flask
+Flask-APScheduler
+Flask-SQLAlchemy
+requests
+requests-oauthlib
+oauthlib

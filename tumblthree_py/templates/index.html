@@ -13,16 +13,26 @@
 </head>
 <body>
     <h1>TumblThree-py</h1>
-    <a href="{{ url_for('maintenance') }}">Maintenance</a>
+    <div>
+        {% if user_info %}
+            <span>Welcome, {{ user_info.name }}!</span>
+            <a href="{{ url_for('logout') }}">Logout</a>
+        {% else %}
+            <a href="{{ url_for('login') }}">Login with Tumblr</a>
+        {% endif %}
+        | <a href="{{ url_for('maintenance') }}">Maintenance</a>
+    </div>
     <hr>
     <h2>Blogs</h2>
     <table>
         <thead>
             <tr>
                 <th>Name</th>
+                <th>Title</th>
                 <th>URL</th>
                 <th>Status</th>
-                <th>Total Posts</th>
+                <th>Progress</th>
+                <th>Posts</th>
                 <th>Actions</th>
             </tr>
         </thead>
@@ -30,9 +40,11 @@
             {% for blog in blogs %}
             <tr>
                 <td>{{ blog.name }}</td>
+                <td>{{ blog.title }}</td>
                 <td><a href="{{ blog.url }}" target="_blank">{{ blog.url }}</a></td>
                 <td>{{ blog.status }}</td>
-                <td>{{ blog.total_count }}</td>
+                <td>{{ "%.2f"|format(blog.progress|float) }}%</td>
+                <td>{{ blog.posts.count() }} / {{ blog.posts_total }}</td>
                 <td>
                     <a href="{{ url_for('crawl_route', blog_id=blog.id) }}">Crawl</a> |
                     <a href="{{ url_for('settings', blog_id=blog.id) }}">Settings</a> |
@@ -45,11 +57,74 @@
 
     <h2>Add New Blog</h2>
     <form action="{{ url_for('add_blog') }}" method="post">
-        <label for="name">Name:</label><br>
-        <input type="text" id="name" name="name" required><br>
         <label for="url">URL:</label><br>
-        <input type="url" id="url" name="url" required><br><br>
+        <input type="url" id="url" name="url" required><br>
+        <label for="name">Name (optional):</label><br>
+        <input type="text" id="name" name="name" placeholder="Leave blank to use name from URL"><br><br>
         <input type="submit" value="Add Blog">
     </form>
+
+    <hr>
+    <h2>Live Log</h2>
+    <pre id="log-output" style="background-color: #f5f5f5; border: 1px solid #ddd; padding: 10px; height: 300px; overflow-y: scroll;"></pre>
+
+    <script>
+        let active_crawl_blog_id = null;
+
+        function updateStatus() {
+            fetch('/status')
+                .then(response => response.json())
+                .then(data => {
+                    let active_crawl_found = false;
+                    for (const blogId in data) {
+                        const blogData = data[blogId];
+                        const row = document.querySelector(`tr[data-blog-id='${blogId}']`);
+                        if (row) {
+                            row.querySelector('.status').textContent = blogData.status;
+                            row.querySelector('.progress').textContent = blogData.progress;
+                            row.querySelector('.posts').textContent = `${blogData.posts_crawled} / ${blogData.posts_total}`;
+                            if (blogData.status === 'crawling') {
+                                active_crawl_blog_id = blogId;
+                                active_crawl_found = true;
+                            }
+                        }
+                    }
+                    if (!active_crawl_found) {
+                        active_crawl_blog_id = null;
+                    }
+                });
+        }
+
+        function updateLog() {
+            if (active_crawl_blog_id) {
+                fetch(`/log/${active_crawl_blog_id}`)
+                    .then(response => response.text())
+                    .then(data => {
+                        const logOutput = document.getElementById('log-output');
+                        logOutput.textContent = data;
+                        logOutput.scrollTop = logOutput.scrollHeight; // Auto-scroll to bottom
+                    });
+            } else {
+                document.getElementById('log-output').textContent = 'No active crawl.';
+            }
+        }
+
+        // Add data-blog-id attribute to each row
+        document.addEventListener("DOMContentLoaded", function() {
+            const rows = document.querySelectorAll('tbody tr');
+            rows.forEach(row => {
+                const blogId = row.querySelector('a[href*="/crawl/"]').href.split('/').pop();
+                row.setAttribute('data-blog-id', blogId);
+                // Add classes to cells for easier selection
+                const cells = row.querySelectorAll('td');
+                cells[3].classList.add('status');
+                cells[4].classList.add('progress');
+                cells[5].classList.add('posts');
+            });
+        });
+
+        setInterval(updateStatus, 2000); // Update status every 2 seconds
+        setInterval(updateLog, 2000); // Update log every 2 seconds
+    </script>
 </body>
 </html>
