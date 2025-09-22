@@ -16,7 +16,7 @@ namespace TumblThree.Applications.Properties
     public sealed class AppSettings : IExtensibleDataObject
     {
         [IgnoreDataMember]
-        public static readonly string USERAGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36";
+        public static readonly string USERAGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36";
 
         [IgnoreDataMember]
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Naming", "CA1707:Identifiers should not contain underscores", Justification = "<Pending>")]
@@ -351,6 +351,9 @@ namespace TumblThree.Applications.Properties
         public bool LoadArchive { get; set; }
 
         [DataMember]
+        public bool LoadAllDatabasesIntoDb { get; set; }
+
+        [DataMember]
         public string ProxyHost { get; set; }
 
         [DataMember]
@@ -421,6 +424,18 @@ namespace TumblThree.Applications.Properties
 
         [DataMember]
         public bool NoCrawlerDataUpdate { get; set; }
+
+        [DataMember]
+        public bool AdaptToTwitterRateLimits { get; set; }
+
+        [IgnoreDataMember]
+        public int RateLimitTwitterLimit { get; set; }
+
+        [IgnoreDataMember]
+        public int RateLimitTwitterRemaining { get; set; }
+
+        [IgnoreDataMember]
+        public int RateLimitTwitterReset { get; set; }
 
         [DataMember]
         public Dictionary<object, Tuple<int, double, Visibility>> ColumnSettings { get; set; }
@@ -562,6 +577,8 @@ namespace TumblThree.Applications.Properties
                 }
             }
 
+            settings.RateLimitTwitterRemaining = 150;
+
             return updated;
         }
 
@@ -655,6 +672,7 @@ namespace TumblThree.Applications.Properties
             PortableMode = false;
             LoadAllDatabases = false;
             LoadArchive = false;
+            LoadAllDatabasesIntoDb = false;
             ProxyHost = string.Empty;
             ProxyPort = string.Empty;
             ProxyUsername = string.Empty;
@@ -681,6 +699,7 @@ namespace TumblThree.Applications.Properties
             ZipCrawlerData = false;
             ZipExistingCrawlerData = false;
             NoCrawlerDataUpdate = false;
+            AdaptToTwitterRateLimits = true;
         }
 
         [OnDeserializing]

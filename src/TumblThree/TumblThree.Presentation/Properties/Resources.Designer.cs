@@ -79,6 +79,15 @@ namespace TumblThree.Presentation.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Adjust to the rate limits of Twitter/X server.
+        /// </summary>
+        public static string AdaptToTwitterRateLimits {
+            get {
+                return ResourceManager.GetString("AdaptToTwitterRateLimits", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Add Blog.
         /// </summary>
         public static string AddBlog {
@@ -1234,6 +1243,15 @@ namespace TumblThree.Presentation.Properties {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to load into global database instead of memory.
+        /// </summary>
+        public static string LoadAllDatabasesIntoDb {
+            get {
+                return ResourceManager.GetString("LoadAllDatabasesIntoDb", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to including archived blogs.
         /// </summary>
         public static string LoadArchive {
@@ -1887,6 +1905,25 @@ namespace TumblThree.Presentation.Properties {
         public static string TimeSpanTypeError {
             get {
                 return ResourceManager.GetString("TimeSpanTypeError", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Adjusts the speed to the rate limits of Twitter/X server.
+        /// </summary>
+        public static string ToolTipAdaptToTwitterRateLimits {
+            get {
+                return ResourceManager.GetString("ToolTipAdaptToTwitterRateLimits", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to If this option is disabled, the rate limits configured in the settings will be strictly maintained, 
+        ///which may result in rejection by the server. This is done at your own risk..
+        /// </summary>
+        public static string ToolTipAdaptToTwitterRateLimitsDescription {
+            get {
+                return ResourceManager.GetString("ToolTipAdaptToTwitterRateLimitsDescription", resourceCulture);
             }
         }
         
@@ -2719,6 +2756,26 @@ namespace TumblThree.Presentation.Properties {
         public static string ToolTipLoadAllDatabasesDescription {
             get {
                 return ResourceManager.GetString("ToolTipLoadAllDatabasesDescription", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Load blog databases into a global database instead of memory.
+        /// </summary>
+        public static string ToolTipLoadAllDatabasesIntoDb {
+            get {
+                return ResourceManager.GetString("ToolTipLoadAllDatabasesIntoDb", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to This option can only be enabled if the global check is enabled.
+        ///It is useful if you are using the global check and have already downloaded a large number of files.
+        ///Enabling this option reduces memory usage because not all blog databases are kept in memory..
+        /// </summary>
+        public static string ToolTipLoadAllDatabasesIntoDbDescription {
+            get {
+                return ResourceManager.GetString("ToolTipLoadAllDatabasesIntoDbDescription", resourceCulture);
             }
         }
         

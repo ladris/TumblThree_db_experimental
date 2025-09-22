@@ -105,6 +105,7 @@ namespace TumblThree.Applications.ViewModels
         private bool _portableMode;
         private bool _loadAllDatabases;
         private bool _loadArchive;
+        private bool _loadAllDatabasesIntoDb;
         private string _proxyHost;
         private string _proxyPort;
         private string _proxyUsername;
@@ -156,6 +157,7 @@ namespace TumblThree.Applications.ViewModels
         private bool _saveTextsIndividualFiles;
         private bool _zipExistingCrawlerData;
         private bool _noCrawlerDataUpdate;
+        private bool _adaptToTwitterRateLimits;
 
         [ImportingConstructor]
         public SettingsViewModel(ISettingsView view, IShellService shellService, ICrawlerService crawlerService, IManagerService managerService,
@@ -605,8 +607,9 @@ namespace TumblThree.Applications.ViewModels
             {
                 if (SetProperty(ref _loadAllDatabases, value))
                 {
-                    if (!_loadAllDatabases) LoadArchive = false;
+                    if (!_loadAllDatabases) LoadArchive = LoadAllDatabasesIntoDb = false;
                     RaisePropertyChanged(nameof(LoadArchiveEnabled));
+                    RaisePropertyChanged(nameof(LoadAllDatabasesIntoDbEnabled));
                 }
             }
         }
@@ -618,6 +621,17 @@ namespace TumblThree.Applications.ViewModels
         }
 
         public bool LoadArchiveEnabled
+        {
+            get => _loadAllDatabases;
+        }
+
+        public bool LoadAllDatabasesIntoDb
+        {
+            get => _loadAllDatabasesIntoDb;
+            set => SetProperty(ref _loadAllDatabasesIntoDb, value);
+        }
+
+        public bool LoadAllDatabasesIntoDbEnabled
         {
             get => _loadAllDatabases;
         }
@@ -1011,6 +1025,12 @@ namespace TumblThree.Applications.ViewModels
             set => SetProperty(ref _zipExistingCrawlerData, value);
         }
 
+        public bool AdaptToTwitterRateLimits
+        {
+            get => _adaptToTwitterRateLimits;
+            set => SetProperty(ref _adaptToTwitterRateLimits, value);
+        }
+
         public void ShowDialog(object owner) => ViewCore.ShowDialog(owner);
 
         private void ViewClosed(object sender, EventArgs e)
@@ -1096,14 +1116,12 @@ namespace TumblThree.Applications.ViewModels
 
         private void BrowseExportLocation()
         {
-            FileDialogResult result =
-                _fileDialogService.ShowSaveFileDialog(ShellService.ShellView, _bloglistExportFileType, ExportLocation);
-            if (!result.IsValid)
+            var exportLocation = Path.GetFullPath(ExportLocation);
+            FileDialogResult result = _fileDialogService.ShowSaveFileDialog(ShellService.ShellView, _bloglistExportFileType, exportLocation);
+            if (result.IsValid)
             {
-                return;
+                ExportLocation = result.FileName;
             }
-
-            ExportLocation = result.FileName;
         }
 
         private void AdaptDefaultCollection()
@@ -1359,6 +1377,7 @@ namespace TumblThree.Applications.ViewModels
                 PortableMode = _settings.PortableMode;
                 LoadAllDatabases = _settings.LoadAllDatabases;
                 LoadArchive = _settings.LoadArchive;
+                LoadAllDatabasesIntoDb = _settings.LoadAllDatabasesIntoDb;
                 ProxyHost = _settings.ProxyHost;
                 ProxyPort = _settings.ProxyPort;
                 ProxyUsername = _settings.ProxyUsername;
@@ -1380,6 +1399,7 @@ namespace TumblThree.Applications.ViewModels
                 SaveTextsIndividualFiles = _settings.SaveTextsIndividualFiles;
                 ZipExistingCrawlerData = _settings.ZipExistingCrawlerData;
                 NoCrawlerDataUpdate = _settings.NoCrawlerDataUpdate;
+                AdaptToTwitterRateLimits = _settings.AdaptToTwitterRateLimits;
             }
             else
             {
@@ -1481,6 +1501,7 @@ namespace TumblThree.Applications.ViewModels
                 SaveTextsIndividualFiles = false;
                 ZipExistingCrawlerData = false;
                 NoCrawlerDataUpdate = false;
+                AdaptToTwitterRateLimits = true;
             }
         }
 
@@ -1651,6 +1672,7 @@ namespace TumblThree.Applications.ViewModels
             _settings.PortableMode = PortableMode;
             _settings.LoadAllDatabases = LoadAllDatabases;
             _settings.LoadArchive = LoadArchive;
+            _settings.LoadAllDatabasesIntoDb = LoadAllDatabasesIntoDb;
             _settings.ProxyHost = ProxyHost;
             _settings.ProxyPort = ProxyPort;
             _settings.ProxyUsername = ProxyUsername;
