@@ -3,6 +3,7 @@ from flask import Flask, render_template, request, redirect, url_for
 from flask_apscheduler import APScheduler
 import click
 from .models import db
+from .migrate import migrate_data
 
 # set configuration values
 class Config:
@@ -19,6 +20,11 @@ def create_app():
 
     # Initialize the database with the app
     db.init_app(app)
+
+    with app.app_context():
+        if not os.path.exists(db_path):
+            print("Database not found, creating it.")
+            db.create_all()
 
     # initialize scheduler
     scheduler = APScheduler()
@@ -56,7 +62,6 @@ def create_app():
     @click.argument('path')
     def migrate_command(path):
         """Migrates data from the old TumblThree JSON files."""
-        from .migrate import migrate_data
         with app.app_context():
             migrate_data(path)
 
@@ -175,6 +180,24 @@ def create_app():
             db.session.add(new_blog)
             db.session.commit()
             print(f"Blog '{name}' added.")
+
+    @app.route('/maintenance')
+    def maintenance():
+        return render_template('maintenance.html')
+
+    @app.route('/maintenance/init-db', methods=['POST'])
+    def init_db_route():
+        with app.app_context():
+            db.create_all()
+        print('Initialized the database.')
+        return redirect(url_for('maintenance'))
+
+    @app.route('/maintenance/migrate', methods=['POST'])
+    def migrate_route():
+        path = request.form['path']
+        with app.app_context():
+            migrate_data(path)
+        return redirect(url_for('maintenance'))
 
     return app
 

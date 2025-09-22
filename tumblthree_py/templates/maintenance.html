@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Maintenance</title>
+</head>
+<body>
+    <h1>Maintenance</h1>
+
+    <h2>Database Initialization</h2>
+    <p>This will create the database tables. Use this if you are setting up the application for the first time or if you want to reset the database.</p>
+    <form action="{{ url_for('init_db_route') }}" method="post">
+        <button type="submit">Initialize Database</button>
+    </form>
+
+    <h2>Data Migration</h2>
+    <p>This will migrate data from the old TumblThree JSON files. Enter the path to the directory containing the JSON files.</p>
+    <form action="{{ url_for('migrate_route') }}" method="post">
+        <label for="path">Path to data:</label>
+        <input type="text" id="path" name="path" size="50">
+        <button type="submit">Migrate Data</button>
+    </form>
+
+    <br>
+    <a href="{{ url_for('index') }}">Back to Dashboard</a>
+</body>
+</html>

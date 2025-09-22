@@ -1,5 +1,6 @@
 import os
 import unittest
+from unittest import mock
 from tumblthree_py.app import create_app
 from tumblthree_py.models import db, Blog, File
 
@@ -50,6 +51,26 @@ class AppTestCase(unittest.TestCase):
 
             # Check that the file is deleted from disk
             self.assertFalse(os.path.exists(filepath))
+
+    def test_maintenance_page(self):
+        response = self.client.get('/maintenance')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Maintenance', response.data)
+
+    def test_init_db_route(self):
+        with self.app.app_context():
+            # This is a bit tricky to test without inspecting the logs or the database file directly.
+            # We can check that the tables are created.
+            with self.client:
+                self.client.post('/maintenance/init-db')
+                # Check if a table was created
+                self.assertTrue(db.engine.dialect.has_table(db.engine.connect(), "blog"))
+
+    @mock.patch('tumblthree_py.app.migrate_data')
+    def test_migrate_route(self, mock_migrate_data):
+        with self.client:
+            self.client.post('/maintenance/migrate', data={'path': '/fake/path'})
+            mock_migrate_data.assert_called_once_with('/fake/path')
 
 if __name__ == '__main__':
     unittest.main()
