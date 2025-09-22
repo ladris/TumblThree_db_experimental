@@ -138,7 +138,7 @@ def create_app():
     def crawl_blog_job(blog_id):
         with app.app_context():
             from .crawler import TumblrCrawler
-            blog = Blog.query.get(blog_id)
+            blog = db.session.get(Blog, blog_id)
             if blog:
                 log_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs', f'{blog.name}.log')
                 with open(log_file_path, 'w', encoding='utf-8') as log_file:
