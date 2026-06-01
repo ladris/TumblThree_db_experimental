@@ -34,6 +34,25 @@ const TT = {
     };
   },
 
+  // Click-to-zoom gallery lightbox.
+  lightbox() {
+    const box = document.getElementById("lightbox");
+    if (!box) return;
+    const img = box.querySelector("img");
+    const cap = box.querySelector(".lb-caption");
+    document.querySelectorAll(".grid img[data-full]").forEach((el) => {
+      el.addEventListener("click", () => {
+        img.src = el.getAttribute("data-full");
+        cap.textContent = el.getAttribute("data-caption") || "";
+        box.hidden = false;
+      });
+    });
+    box.addEventListener("click", () => { box.hidden = true; img.src = ""; });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") { box.hidden = true; img.src = ""; }
+    });
+  },
+
   // Light-touch: reflect crawl activity badges on list pages.
   liveBadges() {
     const src = this._ensureSource();

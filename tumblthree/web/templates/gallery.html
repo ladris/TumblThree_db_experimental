@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Gallery — TumblThree{% endblock %}
+{% block content %}
+<h1>Gallery</h1>
+
+<form method="get" class="inline-form">
+  <select name="blog_id" onchange="this.form.submit()">
+    <option value="">All blogs</option>
+    {% for b in blogs %}
+      <option value="{{ b.id }}" {{ 'selected' if blog_id == b.id }}>{{ b.name }}</option>
+    {% endfor %}
+  </select>
+  <span class="muted">{{ total }} file(s)</span>
+</form>
+
+{% if items %}
+<div class="grid">
+  {% for it in items %}
+    {% set src = url_for('main.media', blog_id=it['blog_id'], filename=it['filename']) %}
+    <figure class="tile">
+      {% if is_image(it['filename']) %}
+        <img loading="lazy" src="{{ src }}" alt="{{ it['filename'] }}"
+             data-full="{{ src }}"
+             data-caption="{{ it['blog_name'] }} — {{ (it['post_body'] or '')[:140] }}">
+      {% else %}
+        <a class="filechip" href="{{ src }}" target="_blank" rel="noopener">
+          <span>{{ it['filename'] }}</span>
+        </a>
+      {% endif %}
+      <figcaption class="muted">{{ it['blog_name'] }}{% if it['size_bytes'] %} · {{ it['size_bytes'] | filesize }}{% endif %}</figcaption>
+    </figure>
+  {% endfor %}
+</div>
+
+<nav class="pager">
+  {% if page > 1 %}<a class="btn" href="{{ url_for('main.gallery', blog_id=blog_id, page=page-1) }}">← Prev</a>{% endif %}
+  <span class="muted">Page {{ page }}</span>
+  {% if has_next %}<a class="btn" href="{{ url_for('main.gallery', blog_id=blog_id, page=page+1) }}">Next →</a>{% endif %}
+</nav>
+{% else %}
+<p class="muted">No media yet. Crawl a blog to populate the gallery.</p>
+{% endif %}
+
+<div id="lightbox" class="lightbox" hidden>
+  <img src="" alt="">
+  <p class="lb-caption"></p>
+</div>
+{% endblock %}
+{% block scripts %}<script>TT.lightbox();</script>{% endblock %}

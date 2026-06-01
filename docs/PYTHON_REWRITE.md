@@ -40,7 +40,8 @@ Data lives in `~/.local/share/tumblthree/` (override with `TUMBLTHREE_DATA_DIR`)
 | **Real Tumblr crawler** (public v1 read-JSON API, no auth) — photos, photosets, video/audio best-effort, text/quote/link/conversation/answer | ✅ |
 | **Concurrent download engine** — thread pool, per-host rate limiting, retries/backoff, atomic writes, de-dup on the hot path | ✅ |
 | Injectable HTTP client (`HttpxClient` / `FakeHttpClient`) so crawlers are testable offline | ✅ |
-| 29 automated tests (db, dedup, importer, web, downloader, Tumblr crawler) | ✅ |
+| **Media gallery** — grid + click-to-zoom lightbox, per-blog filter, paging; media served from disk | ✅ |
+| 30 automated tests (db, dedup, importer, web, downloader, Tumblr crawler, gallery) | ✅ |
 
 The architecture is proven end-to-end: onboarding → add blog → crawl with live
 progress → persisted posts/files → dashboard stats → full-text search.
@@ -81,8 +82,10 @@ tests/                 # pytest
 3. **Auth / login** — the hard part. The C# app used an embedded WebView2 to
    harvest cookies/OAuth. Python options: a **Playwright**-driven interactive
    login, or a **cookie-import** flow. Per-platform.
-4. **Media gallery** — a DB-backed lightbox/grid served from `media/` + `file`,
-   with filtering by blog/type/tag/date, infinite scroll, inline text posts.
+4. **Media gallery** — ✅ *first version done:* a DB-backed grid + click-to-zoom
+   lightbox at `/gallery`, served from `media/` via `/media/<blog>/<file>`, with
+   per-blog filtering and paging. TODO: type/tag/date filters and infinite
+   scroll.
 5. **Queue & scheduling** — a global crawl queue, concurrency caps, and
    cron-like auto-crawl; a small REST/JSON API.
 6. **Parity sweep** — the long tail of per-blog settings, metadata formats,

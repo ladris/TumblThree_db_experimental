@@ -61,3 +61,15 @@ table.data th { color: var(--muted); font-weight: 600; font-size: 13px; }
 .progress { margin: 16px 0; }
 .progress-bar { height: 10px; background: var(--panel2); border-radius: 999px; overflow: hidden; border: 1px solid var(--border); }
 .progress-bar span { display: block; height: 100%; width: 0; background: var(--accent2); transition: width .2s; }
+
+/* gallery */
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; margin-top: 12px; }
+.tile { margin: 0; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.tile img { width: 100%; height: 160px; object-fit: cover; display: block; cursor: zoom-in; background: var(--panel2); }
+.tile figcaption { padding: 6px 8px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.filechip { display: flex; align-items: center; justify-content: center; height: 160px; padding: 8px; text-align: center; word-break: break-all; }
+.pager { display: flex; gap: 12px; align-items: center; justify-content: center; margin: 20px 0; }
+.lightbox { position: fixed; inset: 0; background: rgba(0,0,0,.9); display: flex; flex-direction: column;
+  align-items: center; justify-content: center; z-index: 50; cursor: zoom-out; padding: 24px; }
+.lightbox img { max-width: 92vw; max-height: 82vh; object-fit: contain; border-radius: 8px; }
+.lb-caption { color: #ccc; margin-top: 12px; max-width: 80vw; text-align: center; }

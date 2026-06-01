@@ -197,6 +197,34 @@ class Repository:
                 (query, limit),
             ).fetchall()
 
+    # ----- media / files ----------------------------------------------------
+    def list_media(self, blog_id: Optional[int] = None, *, limit: int = 60,
+                   offset: int = 0) -> list[sqlite3.Row]:
+        sql = (
+            "SELECT f.id, f.blog_id, f.filename, f.link, f.size_bytes, f.post_id,"
+            " b.name AS blog_name, p.url AS post_url, p.body AS post_body"
+            " FROM file f JOIN blog b ON b.id = f.blog_id"
+            " LEFT JOIN post p ON p.id = f.post_id"
+            " WHERE f.filename IS NOT NULL"
+        )
+        params: list = []
+        if blog_id is not None:
+            sql += " AND f.blog_id = ?"
+            params.append(blog_id)
+        sql += " ORDER BY f.downloaded_utc DESC, f.id DESC LIMIT ? OFFSET ?"
+        params += [limit, offset]
+        with self.db.lock:
+            return self.db.conn.execute(sql, params).fetchall()
+
+    def count_media(self, blog_id: Optional[int] = None) -> int:
+        sql = "SELECT COUNT(*) AS n FROM file WHERE filename IS NOT NULL"
+        params: list = []
+        if blog_id is not None:
+            sql += " AND blog_id = ?"
+            params.append(blog_id)
+        with self.db.lock:
+            return self.db.conn.execute(sql, params).fetchone()["n"]
+
     # ----- stats ------------------------------------------------------------
     def stats(self) -> dict:
         with self.db.lock:

@@ -6,14 +6,22 @@ import queue
 from urllib.parse import urlparse
 
 from flask import (
-    Blueprint, Response, current_app, flash, redirect,
-    render_template, request, stream_with_context, url_for,
+    Blueprint, Response, abort, current_app, flash, redirect,
+    render_template, request, send_from_directory, stream_with_context, url_for,
 )
 
 from ..db.models import Blog, BlogType
+from ..download.downloader import safe_name
 from ..importer import LegacyLibrary, import_library
 
 bp = Blueprint("main", __name__)
+
+_IMAGE_EXT = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".avif"}
+
+
+def is_image(filename: str) -> bool:
+    import os
+    return os.path.splitext(filename or "")[1].lower() in _IMAGE_EXT
 
 
 def services():
@@ -172,6 +180,37 @@ def search():
     q = request.args.get("q", "").strip()
     results = svc.repo.search_posts(q) if q else []
     return render_template("search.html", q=q, results=results)
+
+
+# ----- media gallery --------------------------------------------------------
+@bp.route("/gallery")
+def gallery():
+    svc = services()
+    blog_id = request.args.get("blog_id", type=int)
+    page = max(1, request.args.get("page", default=1, type=int))
+    per_page = 60
+    offset = (page - 1) * per_page
+    items = svc.repo.list_media(blog_id=blog_id, limit=per_page, offset=offset)
+    total = svc.repo.count_media(blog_id=blog_id)
+    return render_template(
+        "gallery.html",
+        items=items, is_image=is_image, blogs=svc.repo.list_blogs(),
+        blog_id=blog_id, page=page, per_page=per_page, total=total,
+        has_next=offset + per_page < total,
+    )
+
+
+@bp.route("/media/<int:blog_id>/<path:filename>")
+def media(blog_id: int, filename: str):
+    svc = services()
+    blog = svc.repo.get_blog(blog_id)
+    if blog is None:
+        abort(404)
+    directory = svc.config.media_dir / safe_name(blog.name)
+    try:
+        return send_from_directory(directory, filename)
+    except (FileNotFoundError, NotADirectoryError):
+        abort(404)
 
 
 # ----- settings -------------------------------------------------------------

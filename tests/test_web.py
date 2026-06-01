@@ -48,6 +48,32 @@ def test_crawl_runs_and_persists(client, app):
     assert svc.repo.stats()["posts"] > 0
 
 
+def test_gallery_and_media_serving(client, app):
+    client.post("/setup", data={"action": "fresh"})
+    svc = app.config["SERVICES"]
+    from tumblthree.db import Blog, BlogType, FileIndex
+    from tumblthree.download.downloader import safe_name
+
+    blog = svc.repo.add_blog(Blog(name="picblog", blog_type=BlogType.tumblr))
+    # place a real file on disk + record it
+    media_dir = svc.config.media_dir / safe_name(blog.name)
+    media_dir.mkdir(parents=True, exist_ok=True)
+    (media_dir / "cat.jpg").write_bytes(b"\xff\xd8\xff catbytes")
+    FileIndex(svc.db, blog.id).add("http://x/cat.jpg", filename="cat.jpg", size_bytes=10)
+
+    page = client.get("/gallery")
+    assert page.status_code == 200
+    assert b"cat.jpg" in page.data
+    assert b"picblog" in page.data
+
+    served = client.get(f"/media/{blog.id}/cat.jpg")
+    assert served.status_code == 200
+    assert served.data == b"\xff\xd8\xff catbytes"
+
+    # traversal / missing -> 404
+    assert client.get(f"/media/{blog.id}/nope.jpg").status_code == 404
+
+
 def test_search_endpoint(client, app):
     client.post("/setup", data={"action": "fresh"})
     svc = app.config["SERVICES"]
