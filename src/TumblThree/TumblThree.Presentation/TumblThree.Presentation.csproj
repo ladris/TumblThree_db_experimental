@@ -453,6 +453,11 @@
     <Folder Include="Behaviors\" />
   </ItemGroup>
   <ItemGroup>
+    <!-- Referenced in the startup project so the native SQLitePCLRaw e_sqlite3 binaries
+         (runtimes\win-x86|x64\native) are copied into the application output. -->
+    <PackageReference Include="Microsoft.Data.Sqlite">
+      <Version>6.0.10</Version>
+    </PackageReference>
     <PackageReference Include="FontAwesome.WPF">
       <Version>4.7.0.9</Version>
     </PackageReference>

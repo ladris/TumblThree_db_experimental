@@ -145,7 +145,10 @@ namespace TumblThree.Applications.Services
             databasesLock.EnterWriteLock();
             try
             {
-                databases.Remove(database);
+                if (databases.Remove(database))
+                {
+                    (database as IDisposable)?.Dispose();
+                }
             }
             finally
             {
@@ -171,6 +174,10 @@ namespace TumblThree.Applications.Services
             databasesLock.EnterWriteLock();
             try
             {
+                foreach (IFiles db in databases)
+                {
+                    (db as IDisposable)?.Dispose();
+                }
                 databases.Clear();
             }
             finally
@@ -197,6 +204,10 @@ namespace TumblThree.Applications.Services
             archivesLock.EnterWriteLock();
             try
             {
+                foreach (IFiles db in archiveDatabases)
+                {
+                    (db as IDisposable)?.Dispose();
+                }
                 archiveDatabases.Clear();
             }
             finally

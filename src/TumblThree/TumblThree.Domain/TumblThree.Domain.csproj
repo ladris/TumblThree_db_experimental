@@ -127,6 +127,7 @@
     <Compile Include="Models\Files\TumblrHiddenBlogFiles.cs" />
     <Compile Include="Models\Files\TumblrBlogFiles.cs" />
     <Compile Include="Models\Files\Files.cs" />
+    <Compile Include="Models\Files\SqliteFiles.cs" />
     <Compile Include="Models\Files\TwitterBlogFiles.cs" />
     <Compile Include="Models\PnjDownloadType.cs" />
     <Compile Include="Models\TumblrBlogCrawlerTypes.cs" />
@@ -173,6 +174,11 @@
   </ItemGroup>
   <ItemGroup>
     <CodeAnalysisDictionary Include="Properties\CodeAnalysisDictionary.xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite">
+      <Version>6.0.10</Version>
+    </PackageReference>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\lib\WpfApplicationFramework\WpfApplicationFramework\WpfApplicationFramework.csproj">

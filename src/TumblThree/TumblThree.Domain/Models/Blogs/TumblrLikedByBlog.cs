@@ -29,7 +29,7 @@ namespace TumblThree.Domain.Models.Blogs
             blog.ChildId = Path.Combine(location, blog.Name + "_files." + blog.BlogType);
             if (!File.Exists(blog.ChildId))
             {
-                IFiles files = new TumblrLikedByBlogFiles(blog.Name, blog.Location);
+                IFiles files = SqliteFiles.CreateNew(blog.Name, blog.Location, blog.BlogType);
                 files.Save();
             }
 

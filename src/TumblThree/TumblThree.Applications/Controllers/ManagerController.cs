@@ -771,6 +771,16 @@ namespace TumblThree.Applications.Controllers
                 if (_shellService.Settings.ArchiveIndex && !Directory.Exists(Path.Combine(GetIndexFolderPath(blog.CollectionId), "Archive")))
                     Directory.CreateDirectory(Path.Combine(GetIndexFolderPath(blog.CollectionId), "Archive"));
 
+                // Release any open SQLite connection to this blog's database BEFORE touching the
+                // file on disk; otherwise the move/delete below fails with a sharing violation.
+                if (_shellService.Settings.LoadAllDatabases)
+                {
+                    _managerService.RemoveDatabase(_managerService.Databases
+                                                                .FirstOrDefault(db =>
+                                                                    db.Name.Equals(blog.Name) &&
+                                                                    db.BlogType.Equals(blog.OriginalBlogType)));
+                }
+
                 if (!_shellService.Settings.DeleteOnlyIndex)
                 {
                     try
@@ -815,11 +825,13 @@ namespace TumblThree.Applications.Controllers
 
                         File.Move(indexFile, indexMovedFile);
                         File.Move(currentChildId, childMovedFile);
+                        DeleteSqliteSidecars(currentChildId);
                     }
                     else
                     {
                         File.Delete(indexFile);
                         File.Delete(blog.ChildId);
+                        DeleteSqliteSidecars(blog.ChildId);
                     }
                 }
                 catch (Exception ex)
@@ -830,15 +842,26 @@ namespace TumblThree.Applications.Controllers
                 }
 
                 _managerService.BlogFiles.Remove(blog);
-                if (_shellService.Settings.LoadAllDatabases)
-                {
-                    _managerService.RemoveDatabase(_managerService.Databases
-                                                                .FirstOrDefault(db =>
-                                                                    db.Name.Equals(blog.Name) &&
-                                                                    db.BlogType.Equals(blog.OriginalBlogType)));
-                }
+                // Database connection was already released (and disposed) before the file operations above.
 
                 QueueManager.RemoveItems(QueueManager.Items.Where(item => item.Blog.Equals(blog)));
+            }
+        }
+
+        private static void DeleteSqliteSidecars(string databasePath)
+        {
+            // The SQLite database uses WAL mode; after a clean close the -wal/-shm sidecars are
+            // normally removed, but delete any leftovers so no orphans remain next to the database.
+            foreach (var suffix in new[] { "-wal", "-shm" })
+            {
+                try
+                {
+                    if (File.Exists(databasePath + suffix)) File.Delete(databasePath + suffix);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Verbose("ManagerController:DeleteSqliteSidecars: {0}", ex.Message);
+                }
             }
         }
 

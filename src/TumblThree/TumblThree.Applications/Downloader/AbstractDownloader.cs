@@ -624,6 +624,14 @@ namespace TumblThree.Applications.Downloader
                 {
                     sw.Dispose();
                 }
+
+                // When LoadAllDatabases is enabled the files database is the shared instance owned
+                // by ManagerService (disposed via ClearDatabases). Otherwise this downloader loaded
+                // its own instance and must release the SQLite connection here.
+                if (!shellService.Settings.LoadAllDatabases)
+                {
+                    (files as IDisposable)?.Dispose();
+                }
             }
         }
 

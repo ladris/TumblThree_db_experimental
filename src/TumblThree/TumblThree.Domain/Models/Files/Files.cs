@@ -147,7 +147,52 @@ namespace TumblThree.Domain.Models.Files
             }
         }
 
+        /// <summary>
+        /// Resolves a per-blog "files" database. New databases are SQLite (see <see cref="SqliteFiles"/>);
+        /// legacy JSON files are transparently migrated to SQLite in place on first load. Archive
+        /// (offline-duplicate) snapshots are opened read-only and, if still in the legacy JSON format,
+        /// are read in-memory without migrating the disposable cache copy.
+        /// </summary>
         public static IFiles Load(string fileLocation, int bufferSizeKB, bool isArchive = false)
+        {
+            try
+            {
+                if (isArchive)
+                {
+                    if (SqliteFiles.IsSqliteFile(fileLocation)) return SqliteFiles.OpenReadOnly(fileLocation);
+                    return LoadLegacyJson(fileLocation, bufferSizeKB, true);
+                }
+                return SqliteFiles.LoadOrMigrate(fileLocation, bufferSizeKB);
+            }
+            catch (Exception ex) when (ex is XmlException)
+            {
+                Logger.Error("Error loading file '{0}' (modified with text editor?): {1}", fileLocation, ex.Message);
+                if (!ex.Data.Contains("Filename")) ex.Data.Add("Filename", fileLocation);
+                throw;
+            }
+            catch (Exception ex) when (ex is SerializationException || ex is FileNotFoundException || ex is IOException)
+            {
+                Logger.Error("Error loading file '{0}': {1}", fileLocation, ex.Message);
+                if (!ex.Data.Contains("Filename")) ex.Data.Add("Filename", fileLocation);
+                throw;
+            }
+            catch (Exception ex)
+            {
+                // Surface any other failure (e.g. a SQLite error) through the same channel the
+                // discovery code understands: it reads ex.Data["Filename"] to report a failed load.
+                Logger.Error("Error loading database '{0}': {1}", fileLocation, ex);
+                var se = new SerializationException($"Error loading database '{fileLocation}': {ex.Message}", ex);
+                se.Data.Add("Filename", fileLocation);
+                throw se;
+            }
+        }
+
+        /// <summary>
+        /// Loads a database that is still in the legacy JSON (DataContractJsonSerializer) format.
+        /// Retained so existing libraries can be read and migrated to SQLite, and so archive
+        /// snapshots that predate the migration can still be consumed.
+        /// </summary>
+        internal static IFiles LoadLegacyJson(string fileLocation, int bufferSizeKB, bool isArchive = false)
         {
             try
             {
@@ -158,13 +203,13 @@ namespace TumblThree.Domain.Models.Files
             catch (Exception ex) when (ex is XmlException)
             {
                 Logger.Error("Error loading file '{0}' (modified with text editor?): {1}", fileLocation, ex.Message);
-                ex.Data.Add("Filename", fileLocation);
+                if (!ex.Data.Contains("Filename")) ex.Data.Add("Filename", fileLocation);
                 throw;
             }
             catch (Exception ex) when (ex is SerializationException || ex is FileNotFoundException || ex is IOException)
             {
                 Logger.Error("Error loading file '{0}': {1}", fileLocation, ex.Message);
-                ex.Data.Add("Filename", fileLocation);
+                if (!ex.Data.Contains("Filename")) ex.Data.Add("Filename", fileLocation);
                 throw;
             }
         }
