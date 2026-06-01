@@ -327,3 +327,15 @@ ASALocalRun/
 
 # MFractors (Xamarin productivity tool) working folder 
 .mfractor/
+
+# ---- Python (TumblThree rewrite) ----
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+/instance/
+# local runtime data (db + media)
+*.db
+*.db-wal
+*.db-shm

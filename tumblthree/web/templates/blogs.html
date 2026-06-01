@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Blogs — TumblThree{% endblock %}
+{% block content %}
+<h1>Blogs</h1>
+
+<section class="card">
+  <h2>Add a blog</h2>
+  <form method="post" action="{{ url_for('main.add_blog') }}" class="inline-form">
+    <input type="text" name="url" placeholder="https://name.tumblr.com" required>
+    <select name="blog_type">
+      <option value="tumblr">Tumblr</option>
+      <option value="tmblrpriv">Tumblr (hidden)</option>
+      <option value="tlb">Tumblr liked-by</option>
+      <option value="twitter">Twitter / X</option>
+      <option value="bluesky">Bluesky</option>
+      <option value="newtumbl">newTumbl</option>
+    </select>
+    <button type="submit" class="btn btn-primary">Add</button>
+  </form>
+</section>
+
+{% if blogs %}
+<table class="data">
+  <thead><tr><th>Name</th><th>Type</th><th>Posts</th><th>Downloaded</th><th>Dupes</th><th></th></tr></thead>
+  <tbody>
+    {% for b in blogs %}
+    <tr>
+      <td><a href="{{ url_for('main.blog_detail', blog_id=b.id) }}">{{ b.name }}</a></td>
+      <td><span class="tag">{{ b.blog_type.value }}</span></td>
+      <td>{{ b.total_posts }}</td>
+      <td>{{ b.downloaded_items }}</td>
+      <td>{{ b.duplicates }}</td>
+      <td>{% if b.id in running %}<span class="badge running" data-blog="{{ b.id }}">crawling…</span>{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">No blogs yet.</p>
+{% endif %}
+{% endblock %}
+{% block scripts %}<script>TT.liveBadges();</script>{% endblock %}

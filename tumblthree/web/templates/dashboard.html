@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — TumblThree{% endblock %}
+{% block content %}
+<h1>Dashboard</h1>
+
+<div class="stat-grid">
+  <div class="stat"><span class="stat-n">{{ stats.blogs }}</span><span class="stat-l">Blogs</span></div>
+  <div class="stat"><span class="stat-n">{{ stats.posts }}</span><span class="stat-l">Posts</span></div>
+  <div class="stat"><span class="stat-n">{{ stats.files }}</span><span class="stat-l">Files</span></div>
+  <div class="stat"><span class="stat-n">{{ stats.bytes | filesize }}</span><span class="stat-l">Stored</span></div>
+</div>
+
+<div class="row">
+  <section class="col">
+    <h2>Blogs</h2>
+    {% if blogs %}
+    <table class="data">
+      <thead><tr><th>Name</th><th>Type</th><th>Downloaded</th><th></th></tr></thead>
+      <tbody>
+        {% for b in blogs %}
+        <tr>
+          <td><a href="{{ url_for('main.blog_detail', blog_id=b.id) }}">{{ b.name }}</a></td>
+          <td><span class="tag">{{ b.blog_type.value }}</span></td>
+          <td>{{ b.downloaded_items }}</td>
+          <td>{% if b.id in running %}<span class="badge running" data-blog="{{ b.id }}">crawling…</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="muted">No blogs yet. <a href="{{ url_for('main.blogs') }}">Add one →</a></p>
+    {% endif %}
+  </section>
+
+  <section class="col">
+    <h2>Recent posts</h2>
+    {% if recent %}
+    <ul class="feed">
+      {% for p in recent %}
+      <li><span class="tag">{{ p['post_type'] }}</span>
+        <strong>{{ p['blog_name'] }}</strong> — {{ (p['title'] or p['body'] or '')[:80] }}</li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="muted">Nothing crawled yet.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}<script>TT.liveBadges();</script>{% endblock %}

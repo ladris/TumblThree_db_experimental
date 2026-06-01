@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Search — TumblThree{% endblock %}
+{% block content %}
+<h1>Search</h1>
+<form method="get" class="inline-form">
+  <input type="search" name="q" value="{{ q }}" placeholder="Full-text search across all posts…" autofocus>
+  <button class="btn btn-primary">Search</button>
+</form>
+
+{% if q %}
+<p class="muted">{{ results|length }} result(s) for “{{ q }}”.</p>
+<ul class="feed">
+  {% for p in results %}
+  <li>
+    <span class="tag">{{ p['post_type'] }}</span>
+    <strong>{{ p['blog_name'] }}</strong>
+    {% if p['url'] %}<a href="{{ p['url'] }}" target="_blank" rel="noopener">↗</a>{% endif %}
+    <div class="snippet">{{ p['snippet'] | safe }}</div>
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
+{% endblock %}

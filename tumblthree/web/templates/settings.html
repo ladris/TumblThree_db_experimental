@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Settings — TumblThree{% endblock %}
+{% block content %}
+<h1>Settings</h1>
+<form method="post" class="card">
+  <label>Concurrent connections
+    <input type="number" name="concurrent_connections" min="1" max="64"
+           value="{{ values.concurrent_connections }}">
+  </label>
+  <label>Rate limit (requests / second per host)
+    <input type="number" step="0.5" name="rate_limit_per_sec" min="0.5" max="50"
+           value="{{ values.rate_limit_per_sec }}">
+  </label>
+  <button class="btn btn-primary">Save</button>
+</form>
+
+<section class="card">
+  <h2>Storage</h2>
+  <p class="muted">Database: <code>{{ config.db_path }}</code></p>
+  <p class="muted">Media: <code>{{ config.media_dir }}</code></p>
+</section>
+{% endblock %}

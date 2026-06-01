@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Setup — TumblThree{% endblock %}
+{% block content %}
+<h1>Welcome to TumblThree</h1>
+<p class="muted">Choose how to begin. You can import an existing TumblThree
+library to carry over your blogs and avoid re-downloading anything.</p>
+
+<div class="cards">
+  <section class="card">
+    <h2>Start fresh</h2>
+    <p class="muted">Begin with an empty library.</p>
+    <form method="post">
+      <input type="hidden" name="action" value="fresh">
+      <button type="submit" class="btn">Start fresh</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>Import existing library</h2>
+    <p class="muted">Point at your existing TumblThree download folder (the one
+      containing the <code>Index</code> directory). Blogs and de-duplication
+      records are converted into the new database; your downloaded files stay
+      where they are.</p>
+    <form method="post">
+      <input type="hidden" name="action" value="import">
+      <label>Library directory
+        <input type="text" name="path" placeholder="/path/to/Blogs" required>
+      </label>
+      <button type="submit" class="btn btn-primary">Import &amp; convert</button>
+    </form>
+  </section>
+</div>
+{% endblock %}

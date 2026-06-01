@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}{{ blog.name }} — TumblThree{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('main.blogs') }}">← Blogs</a></p>
+<h1>{{ blog.name }} <span class="tag">{{ blog.blog_type.value }}</span></h1>
+<p class="muted">{{ blog.url }}</p>
+
+<div class="stat-grid">
+  <div class="stat"><span class="stat-n" data-field="total">{{ blog.total_posts }}</span><span class="stat-l">Posts</span></div>
+  <div class="stat"><span class="stat-n" data-field="downloaded">{{ blog.downloaded_items }}</span><span class="stat-l">Downloaded</span></div>
+  <div class="stat"><span class="stat-n" data-field="duplicates">{{ blog.duplicates }}</span><span class="stat-l">Duplicates</span></div>
+</div>
+
+<div class="actions">
+  {% if running %}
+  <form method="post" action="{{ url_for('main.stop_crawl', blog_id=blog.id) }}">
+    <button class="btn">Stop crawl</button></form>
+  {% else %}
+  <form method="post" action="{{ url_for('main.start_crawl', blog_id=blog.id) }}">
+    <button class="btn btn-primary">Start crawl</button></form>
+  {% endif %}
+  <form method="post" action="{{ url_for('main.delete_blog', blog_id=blog.id) }}"
+        onsubmit="return confirm('Remove this blog from the library?');">
+    <button class="btn btn-danger">Remove</button></form>
+</div>
+
+<div id="progress" class="progress" data-blog="{{ blog.id }}" hidden>
+  <div class="progress-bar"><span></span></div>
+  <p class="progress-msg muted"></p>
+</div>
+
+<h2>Recent posts</h2>
+{% if recent %}
+<ul class="feed">
+  {% for p in recent %}
+  <li><span class="tag">{{ p['post_type'] }}</span> {{ (p['title'] or p['body'] or '')[:100] }}</li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="muted">Nothing crawled yet — start a crawl above.</p>
+{% endif %}
+{% endblock %}
+{% block scripts %}<script>TT.liveProgress({{ blog.id }});</script>{% endblock %}
