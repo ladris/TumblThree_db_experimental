@@ -2,27 +2,34 @@
 
 Crawls run on worker threads, each with its **own** SQLite connection (sqlite3
 connections aren't shareable across threads; WAL lets the web connection read
-concurrently). Progress events are fanned out to any number of subscribers
-(e.g. SSE streams).
+concurrently). Within a crawl, media downloads are fanned out across a thread
+pool by the :class:`~tumblthree.download.downloader.Downloader`. Progress events
+are published to any number of subscribers (e.g. SSE streams).
 """
 from __future__ import annotations
 
 import queue
 import threading
+import time
 from pathlib import Path
 from typing import Optional
 
 from .base import CrawlContext, CrawlEvent, Crawler
 from .demo import DemoCrawler
+from .tumblr import TumblrCrawler
 from ..db import Database, FileIndex, Repository
+from ..download.downloader import Downloader
+from ..net import HttpxClient, RateLimiter
 
 
 def crawler_for(blog_type: str) -> Crawler:
     """Resolve a crawler for a blog type.
 
-    Only the demo crawler exists today; real platform crawlers register here as
-    they are ported (tumblr, twitter, bluesky, newtumbl, ...).
+    Public Tumblr blogs use the real (no-auth) crawler; the other platforms and
+    the auth-gated Tumblr variants fall back to the demo crawler until ported.
     """
+    if blog_type == "tumblr":
+        return TumblrCrawler()
     return DemoCrawler()
 
 
@@ -50,8 +57,9 @@ class EventBus:
 
 
 class CrawlManager:
-    def __init__(self, db_path: str | Path):
+    def __init__(self, db_path: str | Path, media_dir: str | Path):
         self.db_path = str(db_path)
+        self.media_dir = Path(media_dir)
         self.bus = EventBus()
         self._threads: dict[int, threading.Thread] = {}
         self._cancels: dict[int, threading.Event] = {}
@@ -85,31 +93,48 @@ class CrawlManager:
 
     def _run(self, blog_id: int, cancel: threading.Event) -> None:
         db = Database(self.db_path, apply_schema=False)
+        http: Optional[HttpxClient] = None
         try:
             repo = Repository(db)
             blog = repo.get_blog(blog_id)
             if blog is None:
                 self.bus.publish(CrawlEvent(blog_id, "error", "Blog not found"))
                 return
+
+            rate = float(repo.get_setting("rate_limit_per_sec", "4") or 4)
+            workers = int(repo.get_setting("concurrent_connections", "8") or 8)
+            http = HttpxClient(RateLimiter(rate))
+
             ctx = CrawlContext(
-                db=db,
-                repo=repo,
-                blog=blog,
+                db=db, repo=repo, blog=blog,
                 files=FileIndex(db, blog_id),
-                cancel=cancel,
-                progress=self.bus.publish,
+                cancel=cancel, progress=self.bus.publish,
+                media_dir=self.media_dir, http=http,
             )
+            ctx.downloader = Downloader(ctx, http, self.media_dir, max_workers=workers)
+
             crawler = crawler_for(blog.blog_type.value)
             crawler.crawl(ctx)
+            ctx.downloader.join()
+
+            repo.update_blog_progress(
+                blog_id,
+                downloaded=ctx.counts["downloaded"],
+                duplicates=ctx.counts["duplicates"],
+                total=ctx.total, last_crawl=int(time.time()),
+            )
             self.bus.publish(
                 CrawlEvent(
                     blog_id, "done",
                     f"Finished: {ctx.counts['downloaded']} new, {ctx.counts['duplicates']} duplicates",
                     downloaded=ctx.counts["downloaded"],
                     duplicates=ctx.counts["duplicates"],
+                    total=ctx.total,
                 )
             )
         except Exception as exc:  # noqa: BLE001
             self.bus.publish(CrawlEvent(blog_id, "error", str(exc)))
         finally:
+            if http is not None:
+                http.close()
             db.close()

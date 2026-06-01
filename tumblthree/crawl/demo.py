@@ -21,7 +21,8 @@ class DemoCrawler(Crawler):
         self.delay = delay
 
     def crawl(self, ctx: CrawlContext) -> None:
-        ctx.report(f"Starting crawl of {ctx.blog.name}", total=self.count)
+        ctx.set_total(self.count)
+        ctx.report(f"Starting crawl of {ctx.blog.name}")
         for i in range(1, self.count + 1):
             if ctx.cancelled:
                 ctx.report("Cancelled")
@@ -32,30 +33,22 @@ class DemoCrawler(Crawler):
             link = f"https://example/{ctx.blog.name}/{i}.jpg"
 
             if ctx.files.exists(link):
-                ctx.counts["duplicates"] += 1
-            else:
-                ctx.repo.add_post(
-                    Post(
-                        blog_id=ctx.blog.id,
-                        post_type="photo" if i % 3 else "text",
-                        remote_id=remote_id,
-                        posted_utc=int(time.time()) - (self.count - i) * 3600,
-                        url=f"https://example/{ctx.blog.name}/post/{i}",
-                        title=f"Post {i}",
-                        body=f"Demo post {i} for {ctx.blog.name} — sample searchable text.",
-                        tags_text="demo, sample",
-                    ),
-                    tags=["demo", "sample"],
-                )
-                ctx.files.add(link, filename=f"{i}.jpg", size_bytes=1024 * i)
-                ctx.counts["downloaded"] += 1
+                ctx.tally(duplicates=1, message=f"Skipped duplicate {i}")
+                continue
 
-            ctx.report(f"Processed post {i}/{self.count}", total=self.count)
-
-        ctx.repo.update_blog_progress(
-            ctx.blog.id,
-            downloaded=ctx.counts["downloaded"],
-            duplicates=ctx.counts["duplicates"],
-            total=self.count,
-            last_crawl=int(time.time()),
-        )
+            ctx.repo.add_post(
+                Post(
+                    blog_id=ctx.blog.id,
+                    post_type="photo" if i % 3 else "text",
+                    remote_id=remote_id,
+                    posted_utc=int(time.time()) - (self.count - i) * 3600,
+                    url=f"https://example/{ctx.blog.name}/post/{i}",
+                    title=f"Post {i}",
+                    body=f"Demo post {i} for {ctx.blog.name} — sample searchable text.",
+                    tags_text="demo, sample",
+                ),
+                tags=["demo", "sample"],
+            )
+            ctx.files.add(link, filename=f"{i}.jpg", size_bytes=1024 * i)
+            ctx.tally(downloaded=1, posts=1, message=f"Processed post {i}/{self.count}")
+        # Final blog counters are persisted once by the crawl worker.

@@ -108,9 +108,9 @@ class FileIndex:
                 " VALUES (?,?,?,?,?,?,?,?)",
                 (self.blog_id, post_id, link, orig, fn, size_bytes, content_hash, int(time.time())),
             )
-        self._links.add(fnv1a64(link))
-        if orig:
-            self._origs.add(fnv1a64(orig))
+            self._links.add(fnv1a64(link))
+            if orig:
+                self._origs.add(fnv1a64(orig))
 
     def add_many(self, entries: Iterable[tuple]) -> int:
         """Bulk import. Each entry is (link, original_link, filename). Returns count."""
@@ -142,6 +142,6 @@ class FileIndex:
             except Exception:
                 self.db.conn.execute("ROLLBACK")
                 raise
-        self._links.update(new_links)
-        self._origs.update(new_origs)
+            self._links.update(new_links)
+            self._origs.update(new_origs)
         return len(rows)

@@ -19,7 +19,7 @@ class Services:
         self.config = config
         self.db = Database(config.db_path)
         self.repo = Repository(self.db)
-        self.crawls = CrawlManager(config.db_path)
+        self.crawls = CrawlManager(config.db_path, config.media_dir)
 
     @property
     def initialized(self) -> bool:

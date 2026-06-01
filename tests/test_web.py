@@ -30,8 +30,9 @@ def test_add_blog_and_detail(client):
 
 
 def test_crawl_runs_and_persists(client, app):
+    # blog_type 'newtumbl' routes to the offline demo crawler (no network).
     client.post("/setup", data={"action": "fresh"})
-    client.post("/blogs/add", data={"url": "https://demo.tumblr.com", "blog_type": "tumblr"})
+    client.post("/blogs/add", data={"url": "https://demo.newtumbl.com", "blog_type": "newtumbl"})
     svc = app.config["SERVICES"]
     blog = svc.repo.list_blogs()[0]
 

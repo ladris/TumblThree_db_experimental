@@ -37,7 +37,10 @@ Data lives in `~/.local/share/tumblthree/` (override with `TUMBLTHREE_DATA_DIR`)
 | **Live progress** via SSE (`/events`, `EventSource`) | ✅ |
 | Full-text **search** UI | ✅ |
 | Network-free **demo crawler** exercising the whole pipeline | ✅ |
-| 21 automated tests (db, dedup, importer, web incl. a live crawl) | ✅ |
+| **Real Tumblr crawler** (public v1 read-JSON API, no auth) — photos, photosets, video/audio best-effort, text/quote/link/conversation/answer | ✅ |
+| **Concurrent download engine** — thread pool, per-host rate limiting, retries/backoff, atomic writes, de-dup on the hot path | ✅ |
+| Injectable HTTP client (`HttpxClient` / `FakeHttpClient`) so crawlers are testable offline | ✅ |
+| 29 automated tests (db, dedup, importer, web, downloader, Tumblr crawler) | ✅ |
 
 The architecture is proven end-to-end: onboarding → add blog → crawl with live
 progress → persisted posts/files → dashboard stats → full-text search.
@@ -67,14 +70,14 @@ tests/                 # pytest
 
 ## Roadmap (the rest of the work, in suggested order)
 
-1. **Real platform crawlers** — the bulk of the effort. Port, one at a time,
-   behind the `Crawler` interface, using `httpx` + `asyncio` (or a thread pool)
-   with per-host rate limiting:
-   Tumblr (public API + svc-JSON), Tumblr hidden/liked-by/search/tagsearch,
-   Twitter/X (GraphQL), Bluesky, newTumbl. Reference: the C# `Crawler/*` classes.
-2. **Download engine** — concurrent file downloads with resume, the de-dup
-   check on the hot path, filename templating, and media stored under
-   `media/<blog>/`. Reference: `AbstractDownloader`.
+1. **Real platform crawlers** — ✅ *Tumblr public (v1 read-JSON) done.* Still to
+   port behind the `Crawler` interface: Tumblr hidden/liked-by/search/tagsearch,
+   Twitter/X (GraphQL), Bluesky, newTumbl. Reference: the archived C#
+   `Crawler/*` classes. (Most of the remaining ones need auth — see step 3.)
+2. **Download engine** — ✅ *done:* concurrent thread pool, per-host rate
+   limiting, retries/backoff, atomic `.part` writes, de-dup on the hot path,
+   media under `media/<blog>/`. Still TODO: filename templating (`%f` etc.) and
+   resume of partially-downloaded large files.
 3. **Auth / login** — the hard part. The C# app used an embedded WebView2 to
    harvest cookies/OAuth. Python options: a **Playwright**-driven interactive
    login, or a **cookie-import** flow. Per-platform.
