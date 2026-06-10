@@ -7,6 +7,17 @@ CREATE TABLE IF NOT EXISTS setting (
     value TEXT
 );
 
+-- Stored authentication sessions, one per platform (tumblr, bluesky, twitter, ...).
+-- Holds cookies and/or tokens as JSON; never logged.
+CREATE TABLE IF NOT EXISTS session (
+    platform    TEXT PRIMARY KEY,
+    label       TEXT,              -- e.g. the logged-in handle, for display
+    cookies     TEXT,              -- JSON: {name: value}
+    headers     TEXT,              -- JSON: {header: value} (e.g. Authorization)
+    data        TEXT,              -- JSON: platform-specific (tokens, DIDs, ...)
+    updated_utc INTEGER
+);
+
 CREATE TABLE IF NOT EXISTS blog (
     id                INTEGER PRIMARY KEY,
     name              TEXT NOT NULL,

@@ -28,6 +28,7 @@ class HttpError(Exception):
 class HttpClient(Protocol):
     def get_text(self, url: str) -> str: ...
     def download_to(self, url: str, dest: Path) -> int: ...
+    def post_json(self, url: str, payload: dict, headers: Optional[dict] = None) -> dict: ...
 
 
 class HttpxClient:
@@ -38,6 +39,7 @@ class HttpxClient:
         rate: Optional[RateLimiter] = None,
         *,
         cookies: Optional[dict] = None,
+        headers: Optional[dict] = None,
         user_agent: str = DEFAULT_UA,
         timeout: float = 30.0,
         max_retries: int = 3,
@@ -47,8 +49,11 @@ class HttpxClient:
         self._httpx = httpx
         self.rate = rate or RateLimiter()
         self.max_retries = max_retries
+        default_headers = {"User-Agent": user_agent}
+        if headers:
+            default_headers.update(headers)
         self.client = httpx.Client(
-            headers={"User-Agent": user_agent},
+            headers=default_headers,
             timeout=timeout,
             follow_redirects=True,
             cookies=cookies or {},
@@ -79,6 +84,26 @@ class HttpxClient:
                 if attempt < self.max_retries:
                     self._retry_sleep(attempt)
         raise HttpError(f"GET {url} failed: {last}")
+
+    def post_json(self, url: str, payload: dict, headers: Optional[dict] = None) -> dict:
+        last: Exception | None = None
+        for attempt in range(self.max_retries + 1):
+            self.rate.acquire(url)
+            try:
+                resp = self.client.post(url, json=payload, headers=headers or {})
+                if resp.status_code == 429 or resp.status_code >= 500:
+                    raise HttpError(f"HTTP {resp.status_code}", resp.status_code)
+                if resp.status_code >= 400:
+                    raise HttpError(f"HTTP {resp.status_code}: {resp.text[:200]}", resp.status_code)
+                return resp.json()
+            except (self._httpx.TransportError, HttpError) as exc:
+                last = exc
+                status = getattr(exc, "status", None)
+                if status and 400 <= status < 500 and status != 429:
+                    raise
+                if attempt < self.max_retries:
+                    self._retry_sleep(attempt)
+        raise HttpError(f"POST {url} failed: {last}")
 
     def download_to(self, url: str, dest: Path) -> int:
         dest = Path(dest)
@@ -117,16 +142,26 @@ class HttpxClient:
 class FakeHttpClient:
     """In-memory client for tests. Maps URLs to text pages and byte blobs."""
 
-    def __init__(self, pages: Optional[dict] = None, blobs: Optional[dict] = None):
+    def __init__(self, pages: Optional[dict] = None, blobs: Optional[dict] = None,
+                 posts: Optional[dict] = None):
         self.pages = pages or {}
         self.blobs = blobs or {}
+        self.posts = posts or {}     # url -> response dict (or callable(payload)->dict)
         self.requested: list[str] = []
+        self.posted: list[tuple] = []
 
     def get_text(self, url: str) -> str:
         self.requested.append(url)
         if url not in self.pages:
             raise HttpError(f"404 {url}", 404)
         return self.pages[url]
+
+    def post_json(self, url: str, payload: dict, headers: Optional[dict] = None) -> dict:
+        self.posted.append((url, payload))
+        if url not in self.posts:
+            raise HttpError(f"404 {url}", 404)
+        resp = self.posts[url]
+        return resp(payload) if callable(resp) else resp
 
     def download_to(self, url: str, dest: Path) -> int:
         self.requested.append(url)

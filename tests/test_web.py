@@ -74,6 +74,24 @@ def test_gallery_and_media_serving(client, app):
     assert client.get(f"/media/{blog.id}/nope.jpg").status_code == 404
 
 
+def test_cookie_import_via_settings(client, app):
+    client.post("/setup", data={"action": "fresh"})
+    resp = client.post("/auth/cookies",
+                       data={"platform": "tumblr", "cookies": "sid=abc; pfg=xyz"},
+                       follow_redirects=True)
+    assert b"Saved 2 cookies" in resp.data
+    svc = app.config["SERVICES"]
+    s = svc.sessions.get("tumblr")
+    assert s.cookies == {"sid": "abc", "pfg": "xyz"}
+    # settings page shows it active and never leaks the value
+    page = client.get("/settings").data
+    assert b"active" in page
+    assert b"abc" not in page
+
+    client.post("/auth/tumblr/clear", follow_redirects=True)
+    assert svc.sessions.get("tumblr") is None
+
+
 def test_search_endpoint(client, app):
     client.post("/setup", data={"action": "fresh"})
     svc = app.config["SERVICES"]

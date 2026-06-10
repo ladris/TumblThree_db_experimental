@@ -41,7 +41,8 @@ Data lives in `~/.local/share/tumblthree/` (override with `TUMBLTHREE_DATA_DIR`)
 | **Concurrent download engine** — thread pool, per-host rate limiting, retries/backoff, atomic writes, de-dup on the hot path | ✅ |
 | Injectable HTTP client (`HttpxClient` / `FakeHttpClient`) so crawlers are testable offline | ✅ |
 | **Media gallery** — grid + click-to-zoom lightbox, per-blog filter, paging; media served from disk | ✅ |
-| 30 automated tests (db, dedup, importer, web, downloader, Tumblr crawler, gallery) | ✅ |
+| **Auth/session layer** — `Session` store; cookie/cookies.txt import; Bluesky app-password login + refresh; optional Playwright login; settings UI | ✅ |
+| 38 automated tests (db, dedup, importer, web, downloader, Tumblr crawler, gallery, auth) | ✅ |
 
 The architecture is proven end-to-end: onboarding → add blog → crawl with live
 progress → persisted posts/files → dashboard stats → full-text search.
@@ -79,9 +80,15 @@ tests/                 # pytest
    limiting, retries/backoff, atomic `.part` writes, de-dup on the hot path,
    media under `media/<blog>/`. Still TODO: filename templating (`%f` etc.) and
    resume of partially-downloaded large files.
-3. **Auth / login** — the hard part. The C# app used an embedded WebView2 to
-   harvest cookies/OAuth. Python options: a **Playwright**-driven interactive
-   login, or a **cookie-import** flow. Per-platform.
+3. **Auth / login** — 🟡 *session layer built:* a per-platform `Session`
+   (cookies + headers + opaque data) persisted in a `session` table and attached
+   to the HTTP client per crawl. Acquirers done: **cookie/cookies.txt import**
+   and **Bluesky app-password login** (+ token refresh); **Playwright
+   interactive login** is wired as an optional acquirer (degrades gracefully if
+   not installed). Settings UI manages it all (status shown without leaking
+   secrets). STILL TODO: the **Tumblr GDPR-consent / anonymous-session
+   bootstrap** (load-bearing for *public* Tumblr too — see Pitfalls), and using
+   the session inside real authenticated crawlers.
 4. **Media gallery** — ✅ *first version done:* a DB-backed grid + click-to-zoom
    lightbox at `/gallery`, served from `media/` via `/media/<blog>/<file>`, with
    per-blog filtering and paging. TODO: type/tag/date filters and infinite

@@ -15,6 +15,69 @@
 </form>
 
 <section class="card">
+  <h2>Accounts &amp; login</h2>
+  <p class="muted">Sessions let TumblThree crawl content that requires being
+    logged in (NSFW/hidden Tumblr, your Bluesky feed, etc.). They are stored
+    locally and never sent anywhere but the originating service.</p>
+
+  <table class="data">
+    <thead><tr><th>Platform</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+      {% for platform in ["tumblr", "bluesky", "twitter", "newtumbl"] %}
+      <tr>
+        <td>{{ platform }}</td>
+        <td>
+          {% set s = sessions.get(platform) %}
+          {% if s %}<span class="badge running">active{% if s.label %} — {{ s.label }}{% endif %}</span>
+          {% else %}<span class="muted">none</span>{% endif %}
+        </td>
+        <td>
+          {% if sessions.get(platform) %}
+          <form method="post" action="{{ url_for('main.auth_clear', platform=platform) }}">
+            <button class="btn btn-danger">Clear</button></form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h3>Import cookies</h3>
+  <p class="muted">Log in with your normal browser, copy the <code>Cookie</code>
+    header (or export <code>cookies.txt</code>) and paste it here.</p>
+  <form method="post" action="{{ url_for('main.auth_cookies') }}">
+    <label>Platform
+      <select name="platform">
+        <option value="tumblr">Tumblr</option>
+        <option value="twitter">Twitter / X</option>
+        <option value="newtumbl">newTumbl</option>
+        <option value="bluesky">Bluesky</option>
+      </select>
+    </label>
+    <label>Cookies
+      <textarea name="cookies" rows="3" placeholder="name=value; name2=value2 …"
+                style="width:100%"></textarea>
+    </label>
+    <button class="btn btn-primary">Save cookies</button>
+  </form>
+
+  <h3>Bluesky app password</h3>
+  <p class="muted">The most reliable login: create an app password in Bluesky
+    settings and enter it here.</p>
+  <form method="post" action="{{ url_for('main.auth_bluesky') }}">
+    <label>Handle <input name="handle" placeholder="name.bsky.social"></label>
+    <label>App password <input name="app_password" type="password" placeholder="xxxx-xxxx-xxxx-xxxx"></label>
+    <button class="btn btn-primary">Log in to Bluesky</button>
+  </form>
+
+  <p class="muted" style="margin-top:12px">
+    Interactive browser login (handles 2FA/CAPTCHAs):
+    {% if playwright %}<strong>available</strong>.{% else %}not installed —
+    <code>pip install playwright &amp;&amp; playwright install chromium</code> to enable.{% endif %}
+  </p>
+</section>
+
+<section class="card">
   <h2>Storage</h2>
   <p class="muted">Database: <code>{{ config.db_path }}</code></p>
   <p class="muted">Media: <code>{{ config.media_dir }}</code></p>

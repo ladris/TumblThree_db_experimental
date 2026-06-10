@@ -17,6 +17,7 @@ from typing import Optional
 from .base import CrawlContext, CrawlEvent, Crawler
 from .demo import DemoCrawler
 from .tumblr import TumblrCrawler
+from ..auth import SessionStore
 from ..db import Database, FileIndex, Repository
 from ..download.downloader import Downloader
 from ..net import HttpxClient, RateLimiter
@@ -103,7 +104,14 @@ class CrawlManager:
 
             rate = float(repo.get_setting("rate_limit_per_sec", "4") or 4)
             workers = int(repo.get_setting("concurrent_connections", "8") or 8)
-            http = HttpxClient(RateLimiter(rate))
+
+            # Attach a stored auth session for this platform, if one exists.
+            session = SessionStore(db).get(blog.blog_type.value)
+            http = HttpxClient(
+                RateLimiter(rate),
+                cookies=session.cookies if session else None,
+                headers=session.headers if session else None,
+            )
 
             ctx = CrawlContext(
                 db=db, repo=repo, blog=blog,

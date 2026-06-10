@@ -223,6 +223,7 @@ def settings():
                 svc.repo.set_setting(key, request.form[key])
         flash("Settings saved.", "success")
         return redirect(url_for("main.settings"))
+    from ..auth import playwright_available
     return render_template(
         "settings.html",
         config=svc.config,
@@ -234,4 +235,48 @@ def settings():
                 "rate_limit_per_sec", str(svc.config.rate_limit_per_sec)
             ),
         },
+        sessions=svc.sessions.status(),
+        playwright=playwright_available(),
     )
+
+
+# ----- authentication / sessions -------------------------------------------
+@bp.route("/auth/cookies", methods=["POST"])
+def auth_cookies():
+    svc = services()
+    from ..auth import session_from_cookies
+    platform = request.form.get("platform", "").strip()
+    cookie_text = request.form.get("cookies", "")
+    try:
+        session = session_from_cookies(platform, cookie_text)
+        svc.sessions.save(session)
+        flash(f"Saved {len(session.cookies)} cookies for {platform}.", "success")
+    except ValueError as exc:
+        flash(str(exc), "error")
+    return redirect(url_for("main.settings"))
+
+
+@bp.route("/auth/bluesky", methods=["POST"])
+def auth_bluesky():
+    svc = services()
+    from ..auth import bluesky_login
+    from ..net import HttpxClient, RateLimiter
+    handle = request.form.get("handle", "").strip()
+    app_password = request.form.get("app_password", "").strip()
+    http = HttpxClient(RateLimiter(svc.config.rate_limit_per_sec))
+    try:
+        session = bluesky_login(http, handle, app_password)
+        svc.sessions.save(session)
+        flash(f"Logged in to Bluesky as {session.label}.", "success")
+    except Exception as exc:  # noqa: BLE001 - surface login failures to the user
+        flash(f"Bluesky login failed: {exc}", "error")
+    finally:
+        http.close()
+    return redirect(url_for("main.settings"))
+
+
+@bp.route("/auth/<platform>/clear", methods=["POST"])
+def auth_clear(platform: str):
+    services().sessions.delete(platform)
+    flash(f"Cleared the {platform} session.", "info")
+    return redirect(url_for("main.settings"))

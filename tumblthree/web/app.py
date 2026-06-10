@@ -6,6 +6,7 @@ from typing import Optional
 
 from flask import Flask
 
+from ..auth import SessionStore
 from ..config import Config
 from ..crawl import CrawlManager
 from ..db import Database, Repository
@@ -19,6 +20,7 @@ class Services:
         self.config = config
         self.db = Database(config.db_path)
         self.repo = Repository(self.db)
+        self.sessions = SessionStore(self.db)
         self.crawls = CrawlManager(config.db_path, config.media_dir)
 
     @property
