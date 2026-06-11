@@ -122,9 +122,9 @@ class TumblrCrawler(Crawler):
             self._handle_text(ctx, post, ptype)
 
     def _save_post(self, ctx: CrawlContext, post: dict, post_type: str,
-                   *, title: str = "", body: str = "") -> Optional[int]:
+                   *, title: str = "", body: str = "") -> tuple[Optional[int], bool]:
         tags = _tags(post)
-        return ctx.repo.add_post(
+        return ctx.repo.add_post_ex(
             Post(
                 blog_id=ctx.blog.id,
                 remote_id=str(post.get("id", "")),
@@ -142,7 +142,7 @@ class TumblrCrawler(Crawler):
     def _handle_photo(self, ctx: CrawlContext, post: dict) -> None:
         if not ctx.blog.download_photo:
             return
-        post_id = self._save_post(ctx, post, "photo", body=post.get("photo-caption", ""))
+        post_id, _ = self._save_post(ctx, post, "photo", body=post.get("photo-caption", ""))
 
         photos = post.get("photos") or []
         urls: Iterable[str]
@@ -161,7 +161,7 @@ class TumblrCrawler(Crawler):
     def _handle_media(self, ctx: CrawlContext, post: dict, *, kind: str,
                       toggle: bool, extractor: re.Pattern) -> None:
         body = post.get(f"{'video' if kind == 'video' else 'audio'}-caption", "")
-        post_id = self._save_post(ctx, post, kind, body=body)
+        post_id, _ = self._save_post(ctx, post, kind, body=body)
         if not toggle:
             return
         blob = " ".join(
@@ -197,5 +197,8 @@ class TumblrCrawler(Crawler):
             title = post.get("question", "") or ""
             body = post.get("answer", "") or ""
         post_type = "text" if ptype == "regular" else ptype
-        self._save_post(ctx, post, post_type, title=title, body=body)
-        ctx.tally(posts=1, downloaded=1, message=f"Saved {post_type} post")
+        _, created = self._save_post(ctx, post, post_type, title=title, body=body)
+        if created:
+            ctx.tally(posts=1, downloaded=1, message=f"Saved {post_type} post")
+        else:
+            ctx.tally(duplicates=1, message=f"Skipped duplicate {post_type} post")

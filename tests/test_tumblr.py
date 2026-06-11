@@ -93,8 +93,9 @@ def test_recrawl_dedups(db, tmp_path, tumblr_pages):
 
     ctx2, repo, _ = _run_crawl(db, tmp_path, http)
     assert repo.stats()["files"] == files_after_first  # nothing new downloaded
-    assert ctx2.counts["duplicates"] == 3
-    assert ctx2.counts["downloaded"] == 1  # only the text post counts as "saved"
+    # 3 image files + 1 already-seen text post are all duplicates on re-crawl
+    assert ctx2.counts["duplicates"] == 4
+    assert ctx2.counts["downloaded"] == 0  # nothing genuinely new
 
 
 def test_photo_toggle_off(db, tmp_path, tumblr_pages):

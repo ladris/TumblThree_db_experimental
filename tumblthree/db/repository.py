@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 import time
 from typing import Optional
@@ -130,6 +131,11 @@ class Repository:
 
     # ----- posts ------------------------------------------------------------
     def add_post(self, post: Post, tags: Optional[list[str]] = None) -> int:
+        """Insert a post (idempotent on blog+remote_id+type). Returns its id."""
+        return self.add_post_ex(post, tags)[0]
+
+    def add_post_ex(self, post: Post, tags: Optional[list[str]] = None) -> tuple[int, bool]:
+        """Like :meth:`add_post` but also returns whether a new row was created."""
         with self.db.lock:
             cur = self.db.conn.execute(
                 "INSERT INTO post(blog_id, remote_id, post_type, posted_utc, url, title,"
@@ -141,16 +147,17 @@ class Repository:
                     post.url, post.title, post.body, post.tags_text, post.raw_json,
                 ),
             )
-            post_id = cur.lastrowid if cur.rowcount else None
+            created = bool(cur.rowcount)
+            post_id = cur.lastrowid if created else None
             if post_id is None:
                 row = self.db.conn.execute(
                     "SELECT id FROM post WHERE blog_id=? AND remote_id=? AND post_type=?",
                     (post.blog_id, post.remote_id, post.post_type),
                 ).fetchone()
                 post_id = row["id"] if row else None
-            if post_id and tags:
+            if post_id and created and tags:
                 self._link_tags(post_id, tags)
-        return post_id
+        return post_id, created
 
     def _link_tags(self, post_id: int, tags: list[str]) -> None:
         for name in tags:
@@ -181,9 +188,21 @@ class Repository:
         with self.db.lock:
             return self.db.conn.execute(sql, params).fetchall()
 
+    @staticmethod
+    def _fts_query(query: str) -> str:
+        """Turn arbitrary user input into a safe FTS5 MATCH expression.
+
+        FTS5 treats bare punctuation/operators (OR, *, quotes, parens) as syntax
+        and raises on malformed input. We extract word tokens and quote each one,
+        AND-ing them together, so any text the user types is a valid query.
+        """
+        tokens = re.findall(r"\w+", query, flags=re.UNICODE)
+        return " ".join(f'"{t}"' for t in tokens)
+
     def search_posts(self, query: str, limit: int = 100) -> list[sqlite3.Row]:
         """Full-text search across post title/body/tags."""
-        if not query.strip():
+        match = self._fts_query(query)
+        if not match:
             return []
         with self.db.lock:
             return self.db.conn.execute(
@@ -194,7 +213,7 @@ class Repository:
                 " JOIN blog b ON b.id = p.blog_id"
                 " WHERE post_fts MATCH ?"
                 " ORDER BY rank LIMIT ?",
-                (query, limit),
+                (match, limit),
             ).fetchall()
 
     # ----- media / files ----------------------------------------------------

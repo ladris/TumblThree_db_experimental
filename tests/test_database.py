@@ -33,6 +33,26 @@ def test_post_dedup_and_fts(db):
     assert repo.search_posts("nonexistentword") == []
 
 
+def test_search_tolerates_malformed_input(db):
+    repo = Repository(db)
+    blog = repo.add_blog(Blog(name="b", blog_type=BlogType.tumblr))
+    repo.add_post(Post(blog_id=blog.id, post_type="text", remote_id="1",
+                       body="hello glorious world"))
+    # none of these may raise; bare operators/punctuation become plain tokens
+    for q in ["hello", "a OR", '"unbalanced', "foo*(", "NEAR(", "()", "   "]:
+        repo.search_posts(q)
+    assert repo.search_posts("glorious")[0]["remote_id"] == "1"
+    assert repo.search_posts("hello world")  # multi-token AND
+
+
+def test_add_post_ex_reports_creation(db):
+    repo = Repository(db)
+    blog = repo.add_blog(Blog(name="b", blog_type=BlogType.tumblr))
+    pid1, created1 = repo.add_post_ex(Post(blog_id=blog.id, post_type="text", remote_id="9", body="x"))
+    pid2, created2 = repo.add_post_ex(Post(blog_id=blog.id, post_type="text", remote_id="9", body="x"))
+    assert created1 is True and created2 is False and pid1 == pid2
+
+
 def test_progress_counters(db):
     repo = Repository(db)
     blog = repo.add_blog(Blog(name="c", blog_type=BlogType.tumblr))
